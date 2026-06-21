@@ -4,13 +4,15 @@
 
 ~15 min · All **UI**.
 
+> **UI-only module** — no `run.ps1`. The semantic model + report are portal-built. Follow the steps below. Prereq: Module 1 gold tables exist.
+
 ---
 
 ## Where this fits
 
 | Before | This module | After |
 | --- | --- | --- |
-| Gold tables in `lh_retail` (Module 1) | Semantic model reads Delta **directly** | Module 8 Data Agent + Power BI agent query this model |
+| Gold tables in `lh_retail` (Module 1) | Semantic model reads Delta **directly** | Module 9 Data Agent + Power BI agent query this model |
 
 Contoso's leadership wants **regional sales dashboards** that refresh when stores close — not tomorrow morning after an import job. **Direct Lake** loads parquet from OneLake into the Analysis Services engine like Import, but data stays live like DirectQuery — **no duplicate semantic copy, no scheduled refresh**.
 
@@ -28,7 +30,7 @@ Contoso's leadership wants **regional sales dashboards** that refresh when store
 
 **Say:** *"Data came straight from OneLake Delta — no import job, no DirectQuery SQL round-trip per visual."*
 
-> **Copilot / Power BI agent:** *"Create a page summarizing net sales by region"*. Module 8 expands this.
+> **Copilot / Power BI agent:** *"Create a page summarizing net sales by region"*. Module 9 expands this.
 
 ---
 
@@ -37,7 +39,7 @@ Contoso's leadership wants **regional sales dashboards** that refresh when store
 1. **New report** from model → **Save** as **`rpt_retail_overview`**.
 2. Visuals: **Card** (Net Sales), **Column chart** (by region), **Line chart** (by sale_date).
 
-This report is the artifact Module 6 lineage and Module 8 agents reference.
+This report is the artifact Module 7 lineage and Module 9 agents reference.
 
 ---
 

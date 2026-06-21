@@ -4,6 +4,11 @@
 
 ~20 min · Mostly **notebooks**, with two **UI** moments (attach lakehouse, create a shortcut).
 
+> **Two ways to do this module:**
+> - **Code:** `pwsh module-1-onelake-lakehouse/run.ps1` — creates the lakehouse, uploads CSVs + notebooks, runs `00`–`06` (end result: bronze/silver/gold tables).
+> - **UI follow-along:** the steps below (build the Copy job + Task flow, then run the notebooks yourself).
+> Prereq either way: `pwsh module-0-setup/setup.ps1 -Action infra`.
+
 ---
 
 ## Where this fits
@@ -22,7 +27,7 @@ Each `.ipynb` includes **markdown cells** with story context, step-by-step expla
 
 | Order | Notebook | Story beat | Key output |
 | --- | --- | --- | --- |
-| 1 | `00_setup.ipynb` | Prepare the lakehouse | `bronze`, `silver`, `gold` schemas |
+| 1 | `00_config.ipynb` | Prepare the lakehouse | `bronze`, `silver`, `gold` schemas |
 | 2 | `01_bronze_ingest.ipynb` | Land nightly POS export | `bronze.stores/products/sales` |
 | 3 | `02_silver_transform.ipynb` | Make data trustworthy | `silver.dim_*`, `silver.fact_sales` + V-Order |
 | 4 | `03_gold_aggregate.ipynb` | Publish data products | `gold.sales_by_store_day`, `gold.sales_by_category` |
@@ -30,15 +35,52 @@ Each `.ipynb` includes **markdown cells** with story context, step-by-step expla
 | 6 | `05_shortcuts.ipynb` | Federate without copying | Shortcut under `Files/` (UI preferred on stage) |
 | 7 | `06_cross_engine_reads.ipynb` | Capstone: one copy, many engines | `gold.sales_by_region` for Module 2 |
 
-Imported by `pwsh module-0-setup/setup.ps1 -Action notebooks`. Every notebook starts with `%run 00_setup`.
+Uploaded by `pwsh module-1-onelake-lakehouse/run.ps1` (or import manually). Every notebook starts with `%run 00_config`.
 
 ---
 
-## 1.1 Attach the lakehouse (UI — do this first)
+## 1.0 Ingest raw files from Blob with a Copy job + a Task flow (UI — the headline)
 
-1. Open workspace **`Fabric-Demo-Workshop`** → notebook **`00_setup`**.
+Contoso's nightly CSVs land in **Azure Blob Storage** (`ntwfabricdemostg/retail-raw/bronze/`), created by `pwsh module-0-setup/setup.ps1 -Action storage`. Instead of magically having data in the lakehouse, we **ingest it live** and wrap it in a **Task flow** so the workspace shows an end-to-end map.
+
+### 1.0a — Build the Task flow (the visual map)
+
+1. In `Fabric-Demo-Workshop`, top of the item list → **Tasks** / **+ Task flow** (or **Set up a task flow**).
+2. Pick a blank flow (or the "Data ingestion and orchestration" template).
+3. Add tasks (boxes) and name them to match our story:
+   - **Get data** → **Store** → **Prepare/Transform** → **Serve**
+4. You'll attach real items to each task as you create them — this is the canvas we keep filling in.
+
+**Say:** *"A Task flow is the workspace's blueprint — Get data, Store, Transform, Serve. It documents and links the items, so a newcomer sees the whole pipeline at a glance."*
+
+### 1.0b — Connection to the blob (once)
+
+1. **Settings (gear) → Manage connections and gateways → New → Cloud**.
+2. **Connection type:** *Azure Blob Storage*. **Account:** `ntwfabricdemostg`.
+3. **Authentication:** *Account key* (or *Workspace identity* if Trusted Access is set up — Module 7). **Create**.
+
+> Scripted shortcut: `pwsh module-0-setup/setup.ps1 -Action connection` (best-effort; falls back to this UI path).
+
+### 1.0c — Copy job: Blob → `lh_retail` `Files/bronze`
+
+1. Workspace → **+ New item → Copy job** → name it **`cj_blob_to_bronze`**.
+2. **Source:** *Azure Blob Storage* → your connection → container `retail-raw`, folder `bronze/` → select the 3 CSVs.
+3. **Destination:** **Lakehouse** `lh_retail` → **Files** → folder `bronze` (so files land exactly where the notebooks read).
+4. **Mode:** *Copy* (full). **Save**, then **Run**.
+5. Watch the run succeed; open `lh_retail → Files/bronze` → the 3 CSVs are now there.
+6. **In the Task flow**, attach `cj_blob_to_bronze` to **Get data** and `lh_retail` to **Store**.
+
+**Say:** *"The Copy job is the managed ingestion engine — no notebook needed to move bytes from blob into OneLake. In the Task flow it becomes the 'Get data' step."*
+
+> **Alternative for testing:** `pwsh module-0-setup/setup.ps1 -Action data` uploads the same CSVs straight to `Files/bronze`, skipping the Copy job (used by the headless smoke test).
+
+---
+
+## 1.1 Attach the lakehouse (UI — before the notebooks)
+
+1. Open workspace **`Fabric-Demo-Workshop`** → notebook **`00_config`**.
 2. Explorer → **Lakehouses** → **+ Add** → **Existing lakehouse** → **`lh_retail`** → **Add** (must show **pinned** as default).
-3. Run all cells in `00_setup`. Expect schemas created + three CSVs listed under `Files/bronze/`.
+3. Run all cells in `00_config`. Expect schemas created + three CSVs listed under `Files/bronze/`.
 
 > Empty `Files/bronze`? Run `pwsh module-0-setup/setup.ps1 -Action data` or upload `stores.csv`, `products.csv`, `sales.csv` from `module-0-setup/data/`.
 
@@ -58,7 +100,7 @@ Run **`01`** through **`03`** in order. Read the markdown in each notebook as yo
 
 **Say:** *"Same files, no movement. Bronze = audit trail, silver = trusted model, gold = what we share with the business."*
 
-> **Copilot:** Notebook Copilot pane → *"Explain this notebook"* or *"Write PySpark to dedupe fact_sales"*. Full agent tour in Module 8.
+> **Copilot:** Notebook Copilot pane → *"Explain this notebook"* or *"Write PySpark to dedupe fact_sales"*. Full agent tour in Module 9.
 
 ---
 

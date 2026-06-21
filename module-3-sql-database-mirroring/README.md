@@ -4,6 +4,10 @@
 
 ~15 min · **UI** + **`oltp_seed.sql`** in this folder.
 
+> **Two ways to do this module:**
+> - **Code:** `pwsh module-3-sql-database-mirroring/run.ps1` — creates `sqldb_orders` and seeds orders (they mirror to OneLake automatically).
+> - **UI follow-along:** the steps below.
+
 ---
 
 ## Where this fits
@@ -47,7 +51,7 @@ Optional: create a **shortcut** in `lh_retail` → `Files/orders_shortcut` → r
 
 **Say:** *"~30s SLO, free mirror compute. GraphQL, schema Git, deployment pipelines — real app backend."*
 
-> **Copilot:** SQL editor completion + NL-to-SQL. Module 8 for agents.
+> **Copilot:** SQL editor completion + NL-to-SQL. Module 9 for agents.
 
 ---
 

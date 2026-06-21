@@ -1,8 +1,10 @@
-# Module 8 — AI Agents & Copilot
+# Module 9 — AI Agents & Copilot
 
 **Story chapter:** *"Talk to your governed gold layer"*
 
 ~10–15 min (optional +15). **Mention + quick demo** — the agentic layer on everything we built.
+
+> **UI-only module** — no `run.ps1`. Copilot and Data Agents are interactive portal experiences. Follow the steps below.
 
 ---
 
@@ -25,7 +27,7 @@ We've shown Contoso's **data estate**. Now we show the **AI layer**: same OneLak
 | **UAE North / non-US-EU** | Enable *"Data sent to Azure OpenAI can be processed outside your capacity's geographic region"* (+ storage/history toggles for Data agents) |
 | **Fallback** | If off → demo via screenshots; explain compliance trade-off |
 
-Our demo env: **F4, UAE North** — confirm toggles before Module 8 live.
+Our demo env: **F4, UAE North** — confirm toggles before Module 9 live.
 
 ---
 

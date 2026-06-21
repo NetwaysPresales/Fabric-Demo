@@ -2,62 +2,67 @@
 
 **Story chapter:** *"Build the stage for Contoso Retail"*
 
-Read this **first**. Gets you from nothing to a workspace with every item the demo needs.
+Read this **first**. It explains the split between **infrastructure** (one script) and **each module** (its own `run.ps1` *or* UI follow-along).
 
 ---
 
-## The story you're setting up
+## The mental model (important)
 
-Before Contoso's data engineers can refine sales or operations can watch freezer sensors, you need a **Fabric workspace** on capacity with the right items:
-
-| Item | Name | Used in |
+| Layer | What | How |
 | --- | --- | --- |
-| Lakehouse (schemas on) | `lh_retail` | Modules 1, 2, 4, 6, 8 |
-| Warehouse | `wh_retail` | Module 2 |
-| SQL Database | `sqldb_orders` | Module 3 |
-| Eventhouse + KQL DB | `eh_telemetry` | Module 5 |
-| Pipeline shell | `pl_ingest` | Module 6 |
-| Notebooks `00`–`06` | module-1 folder | Module 1 |
-| Second workspace | `Fabric-Demo-Workshop-Test` | Module 7 deployment pipeline |
+| **Infrastructure + data sources** | Resource group, Fabric **capacity**, the **workspace**, **Blob Storage** (raw CSVs), **Event Hub** (telemetry) | `module-0-setup/setup.ps1` |
+| **Each module's Fabric items + logic** | Lakehouse, warehouse, SQL DB, eventhouse, notebooks, transforms, etc. | Per-module **`run.ps1`** *or* the module's **UI steps** |
 
-```
-Orders (SQL DB) ──mirror──┐
-                          ▼
-POS CSVs ──► lh_retail (bronze→silver→gold) ──► wh_retail ──► Direct Lake / Power BI
-Telemetry ──► eh_telemetry ──► Eventstream / Activator
-```
+`setup.ps1` deliberately does **not** build the per-module Fabric items. It lays the foundation; then for each module you either:
+
+- **Run the code:** `pwsh module-N-*/run.ps1` — builds that module's items and produces the end result, **or**
+- **Follow the UI:** the click-by-click steps in that module's `README.md`.
+
+> Not every module has a `run.ps1`. Modules **1, 2, 3, 6** do (and **5** partially). Modules **4, 7, 8, 9** are portal features — **UI only**.
 
 ---
 
-## Two setup paths
+## What `setup.ps1` provisions
 
-| Path | Who | How |
-| --- | --- | --- |
-| **A — Scripted** | You have Azure CLI + capacity rights | `setup.ps1 -Action all` |
-| **B — Manual** | Portal-only / Fabric trial | Click-by-click in §3b below |
+```
+Resource group
+ ├─ Fabric capacity (F4)         → the compute
+ │   └─ Workspace               → the shared container for every module
+ ├─ Blob Storage account        → raw CSVs (source for Module 1's Copy job)
+ └─ Event Hubs namespace + hub  → live telemetry source (Module 5)
+```
 
-> Trainer shared a workspace? Skip to **§4 Follow the demo**.
+| `.env` item | Default |
+| --- | --- |
+| Capacity | `ntwfabricdemo` (F4) |
+| Workspace (+ Test) | `Fabric-Demo-Workshop` (+ `-Test`) |
+| Storage | `ntwfabricdemostg` / container `retail-raw` |
+| Event Hub | `ntwfabricdemoeh` / `telemetry` |
 
 ---
 
 ## Prerequisites
 
-**Everyone:** browser, https://app.fabric.microsoft.com, Fabric-enabled tenant, capacity or **60-day trial**.
-
-**Path A also:** Azure CLI (`az login`), PowerShell 7 (`pwsh`), Contributor on a resource group (or existing capacity in `.env`).
+- Browser + https://app.fabric.microsoft.com, Fabric-enabled tenant.
+- **Azure CLI** (`az login`), **PowerShell 7** (`pwsh`).
+- Rights to create a Fabric capacity + storage + event hub in your subscription (or point `.env` at existing ones).
 
 ---
 
-## Path A — Scripted setup
+## One-time foundation
 
-From **repo root**:
+From the **repo root**:
 
 ```powershell
-Copy-Item .env.example .env          # edit AZURE_SUBSCRIPTION_ID, REGION, CAPACITY_NAME
-pwsh module-0-setup/setup.ps1 -Action deps
-pwsh module-0-setup/setup.ps1 -Action all    # provision + data + notebooks
-pwsh module-0-setup/setup.ps1 -Action run    # smoke-test notebooks
-pwsh module-0-setup/setup.ps1 -Action pause  # stop billing when idle
+Copy-Item .env.example .env     # edit AZURE_SUBSCRIPTION_ID, REGION, CAPACITY_NAME,
+                                #      STORAGE_ACCOUNT_NAME, EVENTHUB_NAMESPACE (all globally unique)
+pwsh module-0-setup/setup.ps1 -Action infra      # deps + capacity + workspace + storage + eventhub + connection + data
+```
+
+Then do each module (code or UI). Pause billing when idle:
+
+```powershell
+pwsh module-0-setup/setup.ps1 -Action pause      # resume | status
 ```
 
 ### `setup.ps1` actions
@@ -65,46 +70,44 @@ pwsh module-0-setup/setup.ps1 -Action pause  # stop billing when idle
 | `-Action` | Does |
 | --- | --- |
 | `deps` | Azure CLI check + `microsoft-fabric` extension |
-| `provision` | RG, capacity, workspaces, all items, workspace identity |
-| `data` | Generate CSVs/NDJSON, upload to `Files/bronze` |
-| `notebooks` | Upload Module 1 notebooks (default lakehouse bound) |
-| `all` | deps + provision + data + notebooks |
-| `run` | Headless notebook smoke test |
-| `pause` / `resume` / `status` | Capacity billing |
-| `teardown` | Delete workspaces (optional `-DeleteResourceGroup`) |
-
-Notebook libraries (`pyspark`, `notebookutils`) ship with the **Fabric runtime** — no `requirements.txt`.
-
----
-
-## Path B — Manual portal setup
-
-1. **Workspace** → `Fabric-Demo-Workshop` → License = capacity or Trial.
-2. **+ New item:** Lakehouse `lh_retail` (**Lakehouse schemas** ✓), Warehouse `wh_retail`, SQL database `sqldb_orders`, Eventhouse `eh_telemetry`, Pipeline `pl_ingest`.
-3. **Import notebooks** from `module-1-onelake-lakehouse/` (7 files).
-4. **Upload data:** `module-0-setup/data/*.csv` → `lh_retail/Files/bronze/`.
-5. **Second workspace** `Fabric-Demo-Workshop-Test` for Module 7.
+| `infra` | **Everything below**: capacity + workspace + storage + eventhub + connection + sample data |
+| `capacity` | Create the Fabric capacity (if missing) |
+| `workspace` | Create the workspace(s) on the capacity (+ workspace identity) |
+| `storage` | Create Blob Storage account + container, upload raw CSVs |
+| `eventhub` | Create Event Hubs namespace + hub (Module 5 source) |
+| `connection` | Create a Fabric cloud connection to the blob (Module 1 Copy job) |
+| `data` | (Re)generate the local sample data only |
+| `send-events` | Stream `telemetry.ndjson` into the Event Hub (run during the Module 5 demo) |
+| `pause` / `resume` / `status` | Capacity billing control |
+| `teardown` | Delete the workspace(s) (`-DeleteCapacity` / `-DeleteResourceGroup` for more) |
 
 ---
 
-## Follow the demo
+## Per-module: code vs UI
 
-Open **Fabric-Demo-Workshop** → start **Module 1**.
+| Module | `run.ps1`? | What the code path does |
+| --- | --- | --- |
+| 1 — Lakehouse | ✅ | Create lakehouse, upload CSVs→`Files/bronze`, upload + run notebooks `00`–`06` |
+| 2 — Warehouse | ✅ | Create warehouse, run `warehouse_ddl.sql` + `cross_query.sql` |
+| 3 — SQL DB + mirroring | ✅ | Create SQL DB, run `oltp_seed.sql` (mirrors automatically) |
+| 6 — Machine Learning | ✅ | Train + MLflow-log a model on gold, register, score, write predictions back |
+| 5 — Real-Time | 🟡 partial | Create eventhouse + KQL table/mapping; Eventstream/Activator are UI |
+| 4 — Direct Lake | ❌ UI only | Semantic model + report are portal-built |
+| 7 — Orchestration/Gov | ❌ UI only | Pipelines/dataflows/domains/Purview/MPE |
+| 8 — ALM/Capacity | ❌ UI only | Git, deployment pipelines, Metrics app |
+| 9 — AI agents | ❌ UI only | Copilot / Data Agent are interactive |
 
-### OneLake intro (say before Module 1)
+Each module README starts with: *"Run `run.ps1` for the end result, or follow the UI steps below."*
 
-Click `lh_retail` and point out:
-- **One storage** for the tenant ("OneDrive for data")
-- **Tables** (Delta) vs **Files** (unstructured)
-- **Zero-copy** — every engine reads the same Delta files
-- **Shortcuts** — federate external storage without copying
+---
 
-| # | Next folder |
-| --- | --- |
-| 1 | `module-1-onelake-lakehouse/` |
-| 2–8 | Continue in order |
+## Manual (portal-only) alternative for the foundation
 
-If items won't load → capacity paused → `setup.ps1 -Action resume`.
+If you can't run Azure CLI (e.g. trial-only):
+
+1. **Workspace** → `Fabric-Demo-Workshop` → License = your capacity or Trial.
+2. Create the **Blob Storage account** + container in the Azure portal and upload `module-0-setup/data/*.csv` (run `setup.ps1 -Action data` locally to generate them first).
+3. Then do each module via its UI steps.
 
 ---
 
@@ -112,13 +115,13 @@ If items won't load → capacity paused → `setup.ps1 -Action resume`.
 
 | Symptom | Fix |
 | --- | --- |
-| Capacity not visible after provision | Wait ~1 min, re-run |
-| Fabric token error | `az login` |
-| Spark cold start 2–3 min | Pre-run first cell of `01` before demo |
-| Empty `Files/bronze` | `-Action data` or manual upload |
+| Capacity not visible after create | Wait ~1 min, re-run |
+| Fabric / SQL token error | `az login` |
+| Spark cold start 2–3 min | Pre-run cell 1 of `01` before the demo |
+| Workspace items won't load | Capacity paused → `setup.ps1 -Action resume` |
 
 ## Cost
 
-Pause when idle: `pwsh module-0-setup/setup.ps1 -Action pause`. Trial = 60 days free.
+Pause when idle: `pwsh module-0-setup/setup.ps1 -Action pause`.
 
 **Next:** [`module-1-onelake-lakehouse/`](../module-1-onelake-lakehouse/README.md)

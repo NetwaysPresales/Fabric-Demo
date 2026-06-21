@@ -28,7 +28,7 @@ GO
 
 -- 3) A multi-table transaction (something the lakehouse SQL endpoint CANNOT do)
 BEGIN TRAN;
-    UPDATE dbo.fact_sales_daily SET net_sales = net_sales * 1.00 WHERE region IS NULL;
+    UPDATE dbo.fact_sales_daily SET net_sales = net_sales WHERE net_sales < 0;  -- no-op, just to show a write in the tran
     INSERT INTO dbo.dim_store (store_id, store_name, city, region)
         VALUES (999, 'Pop-up Kiosk', 'Dubai', 'Central');
 COMMIT TRAN;

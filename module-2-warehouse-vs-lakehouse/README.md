@@ -4,6 +4,11 @@
 
 ~15 min · **UI** (warehouse SQL editor) + SQL scripts in this folder.
 
+> **Two ways to do this module:**
+> - **Code:** `pwsh module-2-warehouse-vs-lakehouse/run.ps1` — creates `wh_retail` and runs `warehouse_ddl.sql` + `cross_query.sql`.
+> - **UI follow-along:** the steps below.
+> Prereq: Module 1 produced the gold tables.
+
 ---
 
 ## Where this fits
@@ -46,7 +51,7 @@ Fabric gives both — without duplicating the Delta files.
 
 **Say:** *"Warehouse = SQL devs: DDL, DML, stored procs, V-Order by default. Same Delta underneath."*
 
-> **Copilot:** SQL editor → autocomplete or *"generate top categories by net sales"*. Module 8 for full agent tour.
+> **Copilot:** SQL editor → autocomplete or *"generate top categories by net sales"*. Module 9 for full agent tour.
 
 ---
 

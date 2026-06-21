@@ -8,29 +8,31 @@ A follow-along tour of Microsoft Fabric for a technical audience (data engineers
 
 **Contoso Retail** operates hundreds of stores across regions. Every day they produce:
 
-- **Batch POS exports** — nightly CSV files (stores, products, sales)
+- **Batch POS exports** — nightly CSV files (stores, products, sales) that land in **Azure Blob Storage**
 - **Operational orders** — a live order-management app on SQL (Module 3)
 - **Store telemetry** — freezers, HVAC, foot traffic, checkout queues (Module 5)
 
-We land everything in **OneLake**, refine it through a **medallion lakehouse**, serve SQL personas via a **warehouse**, give executives **Direct Lake Power BI**, react to live events with **Real-Time Intelligence**, and govern the estate with **Purview, Git, and deployment pipelines**. Module 8 adds **Copilot and agents** on top of the gold layer we built.
+We **ingest the blob files with a Copy job into OneLake** (orchestrated visually with a **Task flow**), refine them through a **medallion lakehouse**, serve SQL personas via a **warehouse**, give executives **Direct Lake Power BI**, react to live events with **Real-Time Intelligence**, train an **ML model** on the gold layer, and govern the estate with **Purview, Git, and deployment pipelines**. Module 9 adds **Copilot and agents** on top of everything we built.
 
 ```
-                    ┌── Module 3: sqldb_orders (OLTP app)
-                    │         │ auto-mirror ~30s
-                    ▼         ▼
-POS CSVs ──► Bronze ──► Silver ──► Gold ──► wh_retail (T-SQL)
-  Module 1      │          │         │              │
-                │          │         └──────► Direct Lake ──► Power BI  (Module 4)
-                │          │
-                └─ Shortcuts / zero-copy federation (Module 1)
+Azure Blob Storage (raw CSVs)
+        │  Copy job  (inside a Fabric Task flow: Get data → Store → Transform → Serve)
+        ▼
+   Files/bronze ─► bronze ─► Silver ─► Gold ──► wh_retail (T-SQL)
+      (Module 1, notebooks)      │        │              │
+                                 │        └──────► Direct Lake ──► Power BI  (Module 4)
+                                 │
+   sqldb_orders (OLTP) ──auto-mirror ~30s──► OneLake Delta  (Module 3)
 
 Store telemetry ──► Eventstream ──► Eventhouse ──► Dashboard + Activator  (Module 5)
                                                       │
-Orchestration · Domains · Purview · Security         └── Operations agent  (Module 8)
+ML model on gold (train · MLflow · score)            └── Operations agent  (Module 9)
                               (Module 6)
-
-Git · Deployment Pipelines · Capacity metrics  (Module 7)
+Orchestration · Domains · Purview · Security  (Module 7)
+Git · Deployment Pipelines · Capacity metrics  (Module 8)
 ```
+
+> **Ingestion story (Module 1):** raw files live in **Blob Storage**, not pre-loaded into the lakehouse. A **Copy job** pulls them into `lh_retail` `Files/bronze`, and a **Task flow** gives the workspace a visual Get-data → Store → Transform → Serve map. (The storage account + upload are scripted; the Copy job and Task flow are built live in the portal.)
 
 **One sentence for the room:** *One copy of data in OneLake, every engine, one governance model.*
 
@@ -49,9 +51,10 @@ Git · Deployment Pipelines · Capacity metrics  (Module 7)
 | 3 | [`module-3-sql-database-mirroring`](module-3-sql-database-mirroring/README.md) | *"Operational + analytical, no ETL"* | 15 min | UI + SQL |
 | 4 | [`module-4-direct-lake-powerbi`](module-4-direct-lake-powerbi/README.md) | *"Executive dashboards, import speed + live data"* | 15 min | UI |
 | 5 | [`module-5-real-time-intelligence`](module-5-real-time-intelligence/README.md) | *"The store calls for help"* | 20 min | UI + KQL |
-| 6 | [`module-6-orchestration-governance`](module-6-orchestration-governance/README.md) | *"Run it safely at scale"* | 15 min | UI |
-| 7 | [`module-7-alm-capacity`](module-7-alm-capacity/README.md) | *"Ship changes, watch the meter"* | 10 min | UI |
-| 8 | [`module-8-ai-agents-copilot`](module-8-ai-agents-copilot/README.md) | *"Talk to your gold layer"* | +15 min | UI |
+| 6 | [`module-6-machine-learning`](module-6-machine-learning/README.md) | *"Predict, don't just report"* | 20 min | Notebooks |
+| 7 | [`module-7-orchestration-governance`](module-7-orchestration-governance/README.md) | *"Run it safely at scale"* | 15 min | UI |
+| 8 | [`module-8-alm-capacity`](module-8-alm-capacity/README.md) | *"Ship changes, watch the meter"* | 10 min | UI |
+| 9 | [`module-9-ai-agents-copilot`](module-9-ai-agents-copilot/README.md) | *"Talk to your gold layer"* | +15 min | UI |
 
 ---
 
@@ -61,7 +64,7 @@ Each notebook has **detailed markdown cells** — story context, step explanatio
 
 | Notebook | Story beat |
 | --- | --- |
-| `00_setup` | Attach lakehouse, create medallion schemas |
+| `00_config` | Attach lakehouse, create medallion schemas |
 | `01_bronze_ingest` | Land nightly POS CSVs as Delta |
 | `02_silver_transform` | Clean, dimensional model, V-Order |
 | `03_gold_aggregate` | Business KPI tables for BI |
@@ -69,7 +72,7 @@ Each notebook has **detailed markdown cells** — story context, step explanatio
 | `05_shortcuts` | Zero-copy federation (UI preferred on stage) |
 | `06_cross_engine_reads` | Capstone — Spark, SQL, Power BI, mirroring |
 
-Import via `pwsh module-0-setup/setup.ps1 -Action notebooks` or manually upload from `module-1-onelake-lakehouse/`.
+Uploaded + run by `pwsh module-1-onelake-lakehouse/run.ps1`, or import manually from `module-1-onelake-lakehouse/`.
 
 ---
 
@@ -79,12 +82,31 @@ All scripts read the repo `.env` (copy `.env.example` → `.env`). See [`module-
 
 ## Quick start (scripted)
 
+**1. Foundation** (infrastructure + data sources only):
+
 ```powershell
-Copy-Item .env.example .env        # edit values
-pwsh module-0-setup/setup.ps1 -Action all
-pwsh module-0-setup/setup.ps1 -Action run      # smoke-test notebooks
-pwsh module-0-setup/setup.ps1 -Action pause    # stop billing when idle
+Copy-Item .env.example .env        # edit globally-unique names: CAPACITY_NAME, STORAGE_ACCOUNT_NAME, EVENTHUB_NAMESPACE
+pwsh module-0-setup/setup.ps1 -Action infra    # capacity + workspace + storage + eventhub + connection + data
 ```
+
+**2. Each module** — run the code, or follow the UI steps in its README:
+
+```powershell
+pwsh module-1-onelake-lakehouse/run.ps1            # lakehouse + notebooks + run (bronze→silver→gold)
+pwsh module-2-warehouse-vs-lakehouse/run.ps1       # warehouse + cross-item T-SQL
+pwsh module-3-sql-database-mirroring/run.ps1       # SQL DB + mirroring
+pwsh module-5-real-time-intelligence/run.ps1       # eventhouse + KQL (Eventstream/Activator are UI)
+pwsh module-6-machine-learning/run.ps1             # train + MLflow + score on gold, write predictions back
+# Modules 4, 7, 8, 9 are UI-only (portal features) - follow their READMEs
+```
+
+**3. Billing**:
+
+```powershell
+pwsh module-0-setup/setup.ps1 -Action pause    # stop billing when idle (resume | status)
+```
+
+> **`setup.ps1` = stage crew** (infra + data sources only). The data engineering logic lives in the **module run scripts / notebooks**, which run on Fabric.
 
 ## Repo layout
 

@@ -1,167 +1,102 @@
 <#
 .SYNOPSIS
-  One script to set up, run, and tear down the Fabric demo. Driven by the repo .env.
+  Infrastructure + data-source setup for the Fabric demo. Driven by the repo .env.
+  This script does NOT build per-module Fabric items - each module has its own run.ps1
+  (or you follow the UI steps in that module's README).
 
 .DESCRIPTION
   Actions:
-    deps       Check/install dependencies (Azure CLI login + microsoft-fabric extension).
-    provision  Create RG + capacity + workspaces + items + workspace identity (idempotent).
-    data       Generate sample data and upload the CSVs to OneLake (Files/bronze).
-    notebooks  Upload the module-1 notebooks (binds the default lakehouse).
-    all        deps + provision + data + notebooks (full setup).
-    run        Run notebooks headlessly and report pass/fail (smoke test).
-    pause      Pause the capacity (stop billing).
-    resume     Resume the capacity.
-    status     Show capacity state.
-    teardown   Delete the workspaces (optionally the capacity / resource group).
+    deps        Check/install dependencies (Azure CLI login + microsoft-fabric extension).
+    infra       Everything below in one go: capacity + workspace + storage + eventhub + data.
+    capacity    Create the Fabric capacity (if missing).
+    workspace   Create the Fabric workspace on the capacity (the shared container for all modules).
+    storage     Create an Azure Blob Storage account + container and upload the raw CSVs.
+    eventhub    Create an Event Hubs namespace + hub (the streaming source for Module 5).
+    connection  Create a Fabric cloud connection to the blob account (used by Module 1's Copy job).
+    data        (Re)generate the local sample data only.
+    send-events Stream telemetry.ndjson into the Event Hub (run during the Module 5 demo).
+    pause       Pause the capacity (stop billing).
+    resume      Resume the capacity.
+    status      Show capacity state.
+    teardown    Delete the workspace(s) (optionally the capacity / resource group).
 
 .EXAMPLE
-  pwsh module-0-setup/setup.ps1 -Action all
-  pwsh module-0-setup/setup.ps1 -Action run
-  pwsh module-0-setup/setup.ps1 -Action pause
-  pwsh module-0-setup/setup.ps1 -Action teardown -DeleteResourceGroup
+  pwsh module-0-setup/setup.ps1 -Action infra      # one-time foundation
+  pwsh module-0-setup/setup.ps1 -Action resume     # before a demo
+  pwsh module-0-setup/setup.ps1 -Action pause      # after a demo
 #>
 param(
     [Parameter(Mandatory)]
-    [ValidateSet("deps","provision","data","notebooks","all","run","pause","resume","status","teardown")]
+    [ValidateSet("deps","infra","capacity","workspace","storage","eventhub","connection","data","send-events","pause","resume","status","teardown")]
     [string]$Action,
 
-    # run
-    [string[]]$Notebooks = @("01_bronze_ingest","02_silver_transform","03_gold_aggregate","04_vorder_demo","05_shortcuts","06_cross_engine_reads"),
-    [int]$TimeoutMinutes = 12,
     # data
     [int]$SalesRows = 50000, [int]$TelemetryEvents = 2000, [int]$Stores = 12, [int]$Products = 200, [int]$Seed = 42,
     # teardown
     [switch]$DeleteCapacity, [switch]$DeleteResourceGroup
 )
 
-$ErrorActionPreference = "Stop"
-$RepoRoot   = Split-Path $PSScriptRoot -Parent
-$EnvPath    = Join-Path $RepoRoot ".env"
-$DataDir    = Join-Path $PSScriptRoot "data"
-$NotebookDir= Join-Path $RepoRoot "module-1-onelake-lakehouse"
-$FabricBase = "https://api.fabric.microsoft.com/v1"
+. "$PSScriptRoot/common.ps1"
 
-# ---------- .env helpers ----------
-function Import-DotEnv {
-    $path = $EnvPath
-    if (-not (Test-Path $path)) {
-        $example = Join-Path $RepoRoot ".env.example"
-        if (Test-Path $example) { Write-Warning ".env not found - using .env.example defaults. Copy it to .env and fill it in."; $path = $example }
-        else { throw "No .env or .env.example at repo root." }
-    }
-    $cfg = @{}
-    Get-Content $path | ForEach-Object {
-        $l = $_.Trim()
-        if ($l -and -not $l.StartsWith("#") -and $l.Contains("=")) { $k,$v = $l -split "=",2; $cfg[$k.Trim()] = $v.Trim() }
-    }
-    return $cfg
-}
-function Set-DotEnvValue([string]$Key, [string]$Value) {
-    if (-not (Test-Path $EnvPath)) { return }
-    $found = $false
-    $out = Get-Content $EnvPath | ForEach-Object {
-        if ($_ -match "^\s*$([regex]::Escape($Key))\s*=") { $found = $true; "$Key=$Value" } else { $_ }
-    }
-    if (-not $found) { $out += "$Key=$Value" }
-    Set-Content -Path $EnvPath -Value $out
-}
-
-# ---------- auth / REST helpers ----------
-function Get-FabricHeaders {
-    $t = az account get-access-token --resource "https://api.fabric.microsoft.com" --query accessToken -o tsv 2>$null
-    if (-not $t) { throw "Could not get a Fabric token. Run 'az login' (or: setup.ps1 -Action deps)." }
-    return @{ Authorization = "Bearer $t"; "Content-Type" = "application/json" }
-}
-function Get-StorageHeaders {
-    $t = az account get-access-token --resource "https://storage.azure.com" --query accessToken -o tsv 2>$null
-    if (-not $t) { throw "Could not get a storage token. Run 'az login'." }
-    return @{ Authorization = "Bearer $t"; "x-ms-version" = "2021-10-04" }
-}
-function Invoke-FabricGet([string]$Path, [hashtable]$Headers) { Invoke-RestMethod -Uri "$FabricBase/$Path" -Headers $Headers -Method Get }
-
-function New-FabricItemIfMissing([string]$WorkspaceId, [string]$Collection, [string]$DisplayName, [hashtable]$Body, [hashtable]$Headers) {
-    $existing = (Invoke-FabricGet "workspaces/$WorkspaceId/$Collection" $Headers).value | Where-Object { $_.displayName -eq $DisplayName }
-    if ($existing) { Write-Host "[skip] $Collection/$DisplayName exists ($($existing.id))" -ForegroundColor DarkGray; return $existing.id }
-    $resp = Invoke-WebRequest -Uri "$FabricBase/workspaces/$WorkspaceId/$Collection" -Headers $Headers -Method Post -Body ($Body | ConvertTo-Json -Depth 10)
-    if ($resp.StatusCode -eq 202) {
-        $op = @($resp.Headers["Location"])[0]; if (-not $op) { $op = @($resp.Headers["Operation-Location"])[0] }
-        Write-Host "[wait] $Collection/$DisplayName provisioning..." -ForegroundColor Yellow
-        for ($i=0; $i -lt 60; $i++) { Start-Sleep 5; $st = Invoke-RestMethod -Uri $op -Headers $Headers; if ($st.status -eq "Succeeded") { break }; if ($st.status -eq "Failed") { throw "Provisioning $DisplayName failed." } }
-        $id = ((Invoke-FabricGet "workspaces/$WorkspaceId/$Collection" $Headers).value | Where-Object { $_.displayName -eq $DisplayName }).id
-    } else { $id = ($resp.Content | ConvertFrom-Json).id }
-    Write-Host "[ok]   $Collection/$DisplayName -> $id" -ForegroundColor Green
-    return $id
-}
-
-# ---------- actions ----------
+# ---------- dependencies ----------
 function Invoke-Deps {
     Write-Host "== Dependencies ==" -ForegroundColor Cyan
-    $az = (Get-Command az -ErrorAction SilentlyContinue)
-    if (-not $az) { throw "Azure CLI not found. Install it: https://aka.ms/installazcli (then re-run)." }
+    if (-not (Get-Command az -ErrorAction SilentlyContinue)) { throw "Azure CLI not found: https://aka.ms/installazcli" }
     Write-Host "[ok] Azure CLI: $((az version --query '\"azure-cli\"' -o tsv))" -ForegroundColor Green
     $acct = az account show -o json 2>$null | ConvertFrom-Json
-    if (-not $acct) { Write-Host "Not logged in - launching 'az login'..." -ForegroundColor Yellow; az login | Out-Null; $acct = az account show -o json | ConvertFrom-Json }
+    if (-not $acct) { Write-Host "Logging in..." -ForegroundColor Yellow; az login | Out-Null; $acct = az account show -o json | ConvertFrom-Json }
     Write-Host "[ok] Logged in: $($acct.name)" -ForegroundColor Green
-    Write-Host "Installing/updating the 'microsoft-fabric' CLI extension..." -ForegroundColor Yellow
     az extension add --upgrade --name microsoft-fabric --only-show-errors 2>$null
-    Write-Host "[ok] microsoft-fabric extension: $((az extension show --name microsoft-fabric --query version -o tsv 2>$null))" -ForegroundColor Green
-    Write-Host "Notebook libraries (pyspark, requests, notebookutils) ship with the Fabric runtime - nothing to install." -ForegroundColor DarkGray
-    Write-Host "Optional: 'pip install ms-fabric-cli' for the interactive 'fab' CLI." -ForegroundColor DarkGray
+    Write-Host "[ok] microsoft-fabric extension ready." -ForegroundColor Green
+    Write-Host "Notebook libraries ship with the Fabric runtime - nothing to pip install." -ForegroundColor DarkGray
 }
 
-function Invoke-Provision {
+# ---------- capacity ----------
+function New-Capacity {
     $cfg = Import-DotEnv
-    Write-Host "== Provision ==" -ForegroundColor Cyan
+    Write-Host "== Fabric capacity ==" -ForegroundColor Cyan
     $admin = $cfg.CAPACITY_ADMIN_UPN; if (-not $admin) { $admin = az ad signed-in-user show --query userPrincipalName -o tsv }
     az group create --name $cfg.RESOURCE_GROUP --location $cfg.REGION --only-show-errors | Out-Null
     az extension add --name microsoft-fabric --only-show-errors 2>$null
-    $capObj = az fabric capacity show --resource-group $cfg.RESOURCE_GROUP --capacity-name $cfg.CAPACITY_NAME -o json 2>$null | ConvertFrom-Json
-    if (-not $capObj) {
-        Write-Host "Creating capacity $($cfg.CAPACITY_NAME) ($($cfg.CAPACITY_SKU)) in $($cfg.REGION)..." -ForegroundColor Yellow
-        az fabric capacity create --resource-group $cfg.RESOURCE_GROUP --capacity-name $cfg.CAPACITY_NAME --administration "{members:[$admin]}" --sku "{name:$($cfg.CAPACITY_SKU),tier:Fabric}" --location $cfg.REGION | Out-Null
-    } else { Write-Host "[skip] capacity exists (state $($capObj.state))" -ForegroundColor DarkGray }
-
+    $cap = az fabric capacity show --resource-group $cfg.RESOURCE_GROUP --capacity-name $cfg.CAPACITY_NAME -o json 2>$null | ConvertFrom-Json
+    if (-not $cap) {
+        Write-Host "Creating capacity $($cfg.CAPACITY_NAME) ($($cfg.CAPACITY_SKU))..." -ForegroundColor Yellow
+        az fabric capacity create --resource-group $cfg.RESOURCE_GROUP --capacity-name $cfg.CAPACITY_NAME `
+            --administration "{members:[$admin]}" --sku "{name:$($cfg.CAPACITY_SKU),tier:Fabric}" --location $cfg.REGION | Out-Null
+    } else { Write-Host "[skip] capacity exists (state $($cap.state))" -ForegroundColor DarkGray }
     $h = Get-FabricHeaders
     $capId = ((Invoke-FabricGet "capacities" $h).value | Where-Object { $_.displayName -eq $cfg.CAPACITY_NAME }).id
     if (-not $capId) { throw "Capacity not visible to Fabric yet - wait ~1 min and re-run." }
     Set-DotEnvValue "FABRIC_CAPACITY_ID" $capId
+    Write-Host "[ok] capacity id $capId" -ForegroundColor Green
+    return $capId
+}
 
-    function Get-OrCreateWs($name) {
-        $w = (Invoke-FabricGet "workspaces" $h).value | Where-Object { $_.displayName -eq $name }
-        if (-not $w) { $w = Invoke-RestMethod -Uri "$FabricBase/workspaces" -Headers $h -Method Post -Body (@{ displayName=$name; capacityId=$capId } | ConvertTo-Json); Write-Host "[ok]   workspace $name -> $($w.id)" -ForegroundColor Green }
-        else { Write-Host "[skip] workspace $name exists ($($w.id))" -ForegroundColor DarkGray }
-        return $w.id
-    }
-    $wsId = Get-OrCreateWs $cfg.WORKSPACE_NAME
-    $wsTestId = Get-OrCreateWs $cfg.TEST_WORKSPACE_NAME
+# ---------- workspace ----------
+function New-Workspace {
+    $cfg = Import-DotEnv
+    Write-Host "== Fabric workspace ==" -ForegroundColor Cyan
+    $h = Get-FabricHeaders
+    $capId = $cfg.FABRIC_CAPACITY_ID
+    if (-not $capId) { $capId = ((Invoke-FabricGet "capacities" $h).value | Where-Object { $_.displayName -eq $cfg.CAPACITY_NAME }).id }
+    $wsId     = Get-OrCreateWorkspace $cfg.WORKSPACE_NAME      $capId $h
+    $wsTestId = Get-OrCreateWorkspace $cfg.TEST_WORKSPACE_NAME $capId $h
     Set-DotEnvValue "WORKSPACE_ID" $wsId; Set-DotEnvValue "TEST_WORKSPACE_ID" $wsTestId
-
-    # Workspace identity (Trusted Workspace Access / MPE)
+    # Workspace identity (used by Module 7 - Trusted Workspace Access / MPE). Best-effort.
     try {
         $wi = (Invoke-FabricGet "workspaces/$wsId" $h).workspaceIdentity
         if (-not $wi) {
             Write-Host "Provisioning workspace identity..." -ForegroundColor Yellow
             $r = Invoke-WebRequest -Uri "$FabricBase/workspaces/$wsId/provisionIdentity" -Headers $h -Method Post -Body "{}"
-            $op = @($r.Headers["Location"])[0]; if ($op) { for ($i=0;$i -lt 24;$i++){ Start-Sleep 5; $s=Invoke-RestMethod -Uri $op -Headers $h; if ($s.status -in @("Succeeded","Failed")){break} } }
+            Wait-FabricOperation $r $h 24
             $wi = (Invoke-FabricGet "workspaces/$wsId" $h).workspaceIdentity
         } else { Write-Host "[skip] workspace identity exists" -ForegroundColor DarkGray }
         if ($wi) { Set-DotEnvValue "WORKSPACE_IDENTITY_APP_ID" $wi.applicationId; Set-DotEnvValue "WORKSPACE_IDENTITY_SP_ID" $wi.servicePrincipalId }
     } catch { Write-Host "[warn] workspace identity not provisioned: $($_.Exception.Message)" -ForegroundColor Yellow }
-
-    $lhId  = New-FabricItemIfMissing $wsId "lakehouses"   $cfg.LAKEHOUSE_NAME  @{ displayName=$cfg.LAKEHOUSE_NAME;  description="Medallion lakehouse"; creationPayload=@{ enableSchemas=$true } } $h
-    $whId  = New-FabricItemIfMissing $wsId "warehouses"   $cfg.WAREHOUSE_NAME  @{ displayName=$cfg.WAREHOUSE_NAME;  description="T-SQL serving warehouse" } $h
-    $sqlId = New-FabricItemIfMissing $wsId "sqlDatabases" $cfg.SQLDB_NAME      @{ displayName=$cfg.SQLDB_NAME;      description="OLTP + auto-mirror" } $h
-    $ehId  = New-FabricItemIfMissing $wsId "eventhouses"  $cfg.EVENTHOUSE_NAME @{ displayName=$cfg.EVENTHOUSE_NAME; description="Real-Time Intelligence eventhouse" } $h
-    $kqlId = ((Invoke-FabricGet "workspaces/$wsId/kqlDatabases" $h).value | Where-Object { $_.displayName -eq $cfg.EVENTHOUSE_NAME }).id
-    $pl = (Invoke-FabricGet "workspaces/$wsId/items" $h).value | Where-Object { $_.displayName -eq $cfg.PIPELINE_NAME -and $_.type -eq "DataPipeline" }
-    if (-not $pl) { Invoke-WebRequest -Uri "$FabricBase/workspaces/$wsId/items" -Headers $h -Method Post -Body (@{ displayName=$cfg.PIPELINE_NAME; type="DataPipeline"; description="Build Copy + Notebook activities live" } | ConvertTo-Json) | Out-Null; Write-Host "[ok]   pipeline $($cfg.PIPELINE_NAME)" -ForegroundColor Green }
-    else { Write-Host "[skip] pipeline exists" -ForegroundColor DarkGray }
-
-    Set-DotEnvValue "LAKEHOUSE_ID" $lhId; Set-DotEnvValue "WAREHOUSE_ID" $whId; Set-DotEnvValue "SQLDB_ID" $sqlId; Set-DotEnvValue "EVENTHOUSE_ID" $ehId; if ($kqlId) { Set-DotEnvValue "KQLDB_ID" $kqlId }
-    Write-Host "Provisioned. IDs saved to .env." -ForegroundColor Cyan
+    return $wsId
 }
 
+# ---------- sample data ----------
 function New-SampleData {
     Write-Host "== Generate sample data ==" -ForegroundColor Cyan
     $rng = [System.Random]::new($Seed)
@@ -185,70 +120,112 @@ function New-SampleData {
     Write-Host "[ok] data in $DataDir" -ForegroundColor Green
 }
 
-function Send-Data {
+# ---------- storage ----------
+function New-Storage {
     $cfg = Import-DotEnv
-    Write-Host "== Upload data to OneLake ==" -ForegroundColor Cyan
+    Write-Host "== Blob storage (raw CSV source) ==" -ForegroundColor Cyan
     if (-not (Test-Path (Join-Path $DataDir "sales.csv"))) { New-SampleData }
-    $wsId = $cfg.WORKSPACE_ID; $lhId = $cfg.LAKEHOUSE_ID
-    $sh = Get-StorageHeaders
-    $root = "https://onelake.dfs.fabric.microsoft.com/$wsId/$lhId/$($cfg.BRONZE_FILES_PATH)"
+    $acct = $cfg.STORAGE_ACCOUNT_NAME
+    if (-not $acct) { throw "Set STORAGE_ACCOUNT_NAME in .env (3-24 lowercase letters/numbers, globally unique)." }
+    az group create --name $cfg.RESOURCE_GROUP --location $cfg.REGION --only-show-errors | Out-Null
+    if (-not (az storage account show --name $acct --resource-group $cfg.RESOURCE_GROUP -o json 2>$null)) {
+        Write-Host "Creating storage account $acct..." -ForegroundColor Yellow
+        az storage account create --name $acct --resource-group $cfg.RESOURCE_GROUP --location $cfg.REGION `
+            --sku Standard_LRS --kind StorageV2 --min-tls-version TLS1_2 --only-show-errors | Out-Null
+    } else { Write-Host "[skip] storage account exists" -ForegroundColor DarkGray }
+    $key = az storage account keys list --account-name $acct --resource-group $cfg.RESOURCE_GROUP --query "[0].value" -o tsv
+    az storage container create --name $cfg.STORAGE_CONTAINER --account-name $acct --account-key $key --only-show-errors | Out-Null
+    $prefix = $cfg.STORAGE_RAW_PREFIX
     Get-ChildItem $DataDir -Filter *.csv | ForEach-Object {
-        $bytes = [System.IO.File]::ReadAllBytes($_.FullName); $url = "$root/$($_.Name)"
-        Invoke-WebRequest -Uri "${url}?resource=file" -Headers $sh -Method Put -ContentType "application/octet-stream" | Out-Null
-        Invoke-WebRequest -Uri "${url}?action=append&position=0" -Headers $sh -Method Patch -Body $bytes -ContentType "application/octet-stream" | Out-Null
-        Invoke-WebRequest -Uri "${url}?action=flush&position=$($bytes.Length)" -Headers $sh -Method Patch | Out-Null
-        Write-Host "[ok] uploaded $($_.Name)" -ForegroundColor Green
+        $dest = if ($prefix) { "$prefix/$($_.Name)" } else { $_.Name }
+        az storage blob upload --account-name $acct --account-key $key --container-name $cfg.STORAGE_CONTAINER `
+            --name $dest --file $_.FullName --overwrite --only-show-errors | Out-Null
+        Write-Host "[ok] uploaded $dest" -ForegroundColor Green
     }
+    Write-Host "[ok] raw CSVs at https://$acct.blob.core.windows.net/$($cfg.STORAGE_CONTAINER)/$prefix/" -ForegroundColor Cyan
 }
 
-function Send-Notebooks {
+# ---------- event hub (Module 5 streaming source) ----------
+function New-EventHub {
     $cfg = Import-DotEnv
-    Write-Host "== Upload notebooks ==" -ForegroundColor Cyan
-    $h = Get-FabricHeaders
-    $wsId = $cfg.WORKSPACE_ID; $lhId = $cfg.LAKEHOUSE_ID
-    $existing = (Invoke-FabricGet "workspaces/$wsId/notebooks" $h).value
-    Get-ChildItem $NotebookDir -Filter *.ipynb | Sort-Object Name | ForEach-Object {
-        $name = $_.BaseName
-        $nb = Get-Content $_.FullName -Raw | ConvertFrom-Json
-        if (-not $nb.metadata) { $nb | Add-Member -NotePropertyName metadata -NotePropertyValue ([pscustomobject]@{}) -Force }
-        $lh = [pscustomobject]@{ default_lakehouse=$lhId; default_lakehouse_name=$cfg.LAKEHOUSE_NAME; default_lakehouse_workspace_id=$wsId; known_lakehouses=@([pscustomobject]@{ id=$lhId }) }
-        $nb.metadata | Add-Member -NotePropertyName dependencies -NotePropertyValue ([pscustomobject]@{ lakehouse=$lh }) -Force
-        $b64 = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes(($nb | ConvertTo-Json -Depth 50)))
-        $def = @{ format="ipynb"; parts=@(@{ path="notebook-content.ipynb"; payload=$b64; payloadType="InlineBase64" }) }
-        $m = $existing | Where-Object { $_.displayName -eq $name }
-        if ($m) { Invoke-WebRequest -Uri "$FabricBase/workspaces/$wsId/notebooks/$($m.id)/updateDefinition" -Headers $h -Method Post -Body (@{ definition=$def } | ConvertTo-Json -Depth 20) | Out-Null; Write-Host "[update] $name" -ForegroundColor Green }
-        else { Invoke-WebRequest -Uri "$FabricBase/workspaces/$wsId/notebooks" -Headers $h -Method Post -Body (@{ displayName=$name; definition=$def } | ConvertTo-Json -Depth 20) | Out-Null; Write-Host "[create] $name" -ForegroundColor Green }
-    }
-    Write-Host "[ok] default lakehouse '$($cfg.LAKEHOUSE_NAME)' bound into each notebook." -ForegroundColor Cyan
+    Write-Host "== Event Hubs (Module 5 streaming source) ==" -ForegroundColor Cyan
+    $ns = $cfg.EVENTHUB_NAMESPACE; $hub = $cfg.EVENTHUB_NAME
+    if (-not $ns) { throw "Set EVENTHUB_NAMESPACE in .env (globally unique)." }
+    az group create --name $cfg.RESOURCE_GROUP --location $cfg.REGION --only-show-errors | Out-Null
+    if (-not (az eventhubs namespace show --resource-group $cfg.RESOURCE_GROUP --name $ns -o json 2>$null)) {
+        Write-Host "Creating Event Hubs namespace $ns..." -ForegroundColor Yellow
+        az eventhubs namespace create --resource-group $cfg.RESOURCE_GROUP --name $ns --location $cfg.REGION --sku Standard --only-show-errors | Out-Null
+    } else { Write-Host "[skip] namespace exists" -ForegroundColor DarkGray }
+    if (-not (az eventhubs eventhub show --resource-group $cfg.RESOURCE_GROUP --namespace-name $ns --name $hub -o json 2>$null)) {
+        az eventhubs eventhub create --resource-group $cfg.RESOURCE_GROUP --namespace-name $ns --name $hub --partition-count 2 --cleanup-policy Delete --retention-time 24 --only-show-errors | Out-Null
+        Write-Host "[ok] event hub $hub" -ForegroundColor Green
+    } else { Write-Host "[skip] event hub exists" -ForegroundColor DarkGray }
+    $conn = az eventhubs namespace authorization-rule keys list --resource-group $cfg.RESOURCE_GROUP --namespace-name $ns --name RootManageSharedAccessKey --query primaryConnectionString -o tsv
+    Set-DotEnvValue "EVENTHUB_CONNECTION_STRING" $conn
+    Write-Host "[ok] connection string saved to .env (EVENTHUB_CONNECTION_STRING)" -ForegroundColor Green
+    Write-Host "In Module 5, add an Eventstream source = Azure Event Hubs -> namespace '$ns', hub '$hub'." -ForegroundColor Cyan
 }
 
-function Invoke-RunNotebooks {
+# Build a Service Bus / Event Hubs SAS token from a connection string.
+function Get-EventHubSas([string]$ConnectionString) {
+    $ep = ($ConnectionString -split ";" | Where-Object { $_ -like "Endpoint=*" }) -replace "Endpoint=sb://","" -replace "/$",""
+    $kn = (($ConnectionString -split ";" | Where-Object { $_ -like "SharedAccessKeyName=*" }) -split "=",2)[1]
+    $kv = (($ConnectionString -split ";" | Where-Object { $_ -like "SharedAccessKey=*" }) -split "=",2)[1]
+    $uri = [System.Web.HttpUtility]::UrlEncode("https://$ep")
+    $exp = [int][double]::Parse((Get-Date -Date (Get-Date).ToUniversalTime() -UFormat %s)) + 3600
+    $sig = "$uri`n$exp"
+    $h = [System.Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes($kv))
+    $hash = [Convert]::ToBase64String($h.ComputeHash([Text.Encoding]::UTF8.GetBytes($sig)))
+    $hashEnc = [System.Web.HttpUtility]::UrlEncode($hash)
+    return @{ Host = $ep; Token = "SharedAccessSignature sr=$uri&sig=$hashEnc&se=$exp&skn=$kn" }
+}
+
+function Send-Events {
+    Add-Type -AssemblyName System.Web
     $cfg = Import-DotEnv
-    Write-Host "== Run notebooks (smoke test) ==" -ForegroundColor Cyan
-    $h = Get-FabricHeaders; $wsId = $cfg.WORKSPACE_ID
-    $all = (Invoke-FabricGet "workspaces/$wsId/notebooks" $h).value
-    $results = @()
-    foreach ($name in $Notebooks) {
-        $nb = $all | Where-Object { $_.displayName -eq $name }
-        if (-not $nb) { Write-Host "[skip] $name not found" -ForegroundColor DarkGray; continue }
-        Write-Host "[run ] $name ..." -ForegroundColor Yellow -NoNewline
-        $h = Get-FabricHeaders
-        $resp = Invoke-WebRequest -Uri "$FabricBase/workspaces/$wsId/items/$($nb.id)/jobs/instances?jobType=RunNotebook" -Headers $h -Method Post -Body "{}"
-        $poll = @($resp.Headers["Location"])[0]; $deadline = (Get-Date).AddMinutes($TimeoutMinutes); $status = "Unknown"
-        while ((Get-Date) -lt $deadline) {
-            Start-Sleep 15
-            try { $st = Invoke-RestMethod -Uri $poll -Headers (Get-FabricHeaders); $status = $st.status } catch { $status = "PollError" }
-            if ($status -in @("Completed","Failed","Cancelled","Deduped")) { break }
-            Write-Host "." -NoNewline
+    Write-Host "== Stream telemetry into Event Hub ==" -ForegroundColor Cyan
+    if (-not $cfg.EVENTHUB_CONNECTION_STRING) { throw "No EVENTHUB_CONNECTION_STRING in .env. Run: setup.ps1 -Action eventhub" }
+    if (-not (Test-Path (Join-Path $DataDir "telemetry.ndjson"))) { New-SampleData }
+    $sas = Get-EventHubSas $cfg.EVENTHUB_CONNECTION_STRING
+    $url = "https://$($sas.Host)/$($cfg.EVENTHUB_NAME)/messages?api-version=2014-01"
+    $headers = @{ Authorization = $sas.Token; "Content-Type" = "application/json" }
+    $n = 0; $fail = 0
+    Get-Content (Join-Path $DataDir "telemetry.ndjson") | ForEach-Object {
+        $line = $_
+        for ($try = 0; $try -lt 3; $try++) {
+            try { Invoke-WebRequest -Uri $url -Headers $headers -Method Post -Body $line | Out-Null; $n++; break }
+            catch { Start-Sleep -Milliseconds 500; if ($try -eq 2) { $fail++ } }
         }
-        Write-Host " $status" -ForegroundColor $(if ($status -eq "Completed") {"Green"} else {"Red"})
-        $results += [pscustomobject]@{ Notebook=$name; Status=$status }
+        if ($n % 100 -eq 0 -and $n -gt 0) { Write-Host "  sent $n events..." -ForegroundColor DarkGray }
     }
-    Write-Host "`n==== Run summary ====" -ForegroundColor Cyan
-    $results | Format-Table -AutoSize
-    if ($results.Status -contains "Failed") { exit 1 }
+    Write-Host "[ok] sent $n events to $($cfg.EVENTHUB_NAME)$(if ($fail) { " ($fail failed)" })" -ForegroundColor Green
 }
 
+# ---------- blob connection (used by Module 1 Copy job) ----------
+function New-BlobConnection {
+    $cfg = Import-DotEnv
+    Write-Host "== Fabric cloud connection to Blob ==" -ForegroundColor Cyan
+    $h = Get-FabricHeaders
+    $acct = $cfg.STORAGE_ACCOUNT_NAME
+    if (-not $acct) { throw "Set STORAGE_ACCOUNT_NAME and run -Action storage first." }
+    $name = "conn_$acct"
+    $existing = (Invoke-RestMethod -Uri "$FabricBase/connections" -Headers $h).value | Where-Object { $_.displayName -eq $name }
+    if ($existing) { Write-Host "[skip] connection exists ($($existing.id))" -ForegroundColor DarkGray; Set-DotEnvValue "BLOB_CONNECTION_ID" $existing.id; return }
+    $key = az storage account keys list --account-name $acct --resource-group $cfg.RESOURCE_GROUP --query "[0].value" -o tsv
+    $body = @{
+        connectivityType  = "ShareableCloud"; displayName = $name
+        connectionDetails = @{ type="AzureBlobs"; creationMethod="AzureBlobs"; parameters=@(
+            @{ dataType="Text"; name="account"; value=$acct }, @{ dataType="Text"; name="domain"; value="blob.core.windows.net" }) }
+        privacyLevel      = "Organizational"
+        credentialDetails = @{ singleSignOnType="None"; connectionEncryption="NotEncrypted"; skipTestConnection=$false; credentials=@{ credentialType="Key"; key=$key } }
+    }
+    try {
+        $r = Invoke-RestMethod -Uri "$FabricBase/connections" -Headers $h -Method Post -Body ($body | ConvertTo-Json -Depth 10)
+        Write-Host "[ok] connection $name -> $($r.id)" -ForegroundColor Green; Set-DotEnvValue "BLOB_CONNECTION_ID" $r.id
+    } catch { Write-Host "[warn] could not create connection via API: $($_.Exception.Message). Create it in the UI." -ForegroundColor Yellow }
+}
+
+# ---------- capacity billing ----------
 function Set-Capacity([string]$Mode) {
     $cfg = Import-DotEnv
     if ($Mode -eq "pause")  { Write-Host "Pausing $($cfg.CAPACITY_NAME)..." -ForegroundColor Yellow; az fabric capacity suspend --resource-group $cfg.RESOURCE_GROUP --capacity-name $cfg.CAPACITY_NAME }
@@ -265,21 +242,24 @@ function Invoke-Teardown {
         if ($w) { Write-Host "Deleting workspace $name..." -ForegroundColor Yellow; Invoke-RestMethod -Uri "$FabricBase/workspaces/$($w.id)" -Headers $h -Method Delete | Out-Null; Write-Host "[ok] deleted" -ForegroundColor Green }
         else { Write-Host "[skip] $name not found" -ForegroundColor DarkGray }
     }
-    if ($DeleteResourceGroup) { Write-Host "Deleting resource group $($cfg.RESOURCE_GROUP)..." -ForegroundColor Yellow; az group delete --name $cfg.RESOURCE_GROUP --yes --no-wait }
-    elseif ($DeleteCapacity) { Write-Host "Deleting capacity $($cfg.CAPACITY_NAME)..." -ForegroundColor Yellow; az fabric capacity delete --resource-group $cfg.RESOURCE_GROUP --capacity-name $cfg.CAPACITY_NAME --yes }
+    if ($DeleteResourceGroup) { Write-Host "Deleting resource group..." -ForegroundColor Yellow; az group delete --name $cfg.RESOURCE_GROUP --yes --no-wait }
+    elseif ($DeleteCapacity) { Write-Host "Deleting capacity..." -ForegroundColor Yellow; az fabric capacity delete --resource-group $cfg.RESOURCE_GROUP --capacity-name $cfg.CAPACITY_NAME --yes }
     Write-Host "Teardown complete." -ForegroundColor Cyan
 }
 
 # ---------- dispatch ----------
 switch ($Action) {
-    "deps"      { Invoke-Deps }
-    "provision" { Invoke-Provision }
-    "data"      { New-SampleData; Send-Data }
-    "notebooks" { Send-Notebooks }
-    "all"       { Invoke-Deps; Invoke-Provision; New-SampleData; Send-Data; Send-Notebooks; Write-Host "`nFull setup done. Pause when idle: setup.ps1 -Action pause" -ForegroundColor Magenta }
-    "run"       { Invoke-RunNotebooks }
-    "pause"     { Set-Capacity "pause" }
-    "resume"    { Set-Capacity "resume" }
-    "status"    { Set-Capacity "status" }
-    "teardown"  { Invoke-Teardown }
+    "deps"        { Invoke-Deps }
+    "capacity"    { New-Capacity | Out-Null }
+    "workspace"   { New-Workspace | Out-Null }
+    "storage"     { New-Storage }
+    "eventhub"    { New-EventHub }
+    "connection"  { New-BlobConnection }
+    "data"        { New-SampleData }
+    "send-events" { Send-Events }
+    "infra"       { Invoke-Deps; New-Capacity | Out-Null; New-Workspace | Out-Null; New-SampleData; New-Storage; New-BlobConnection; New-EventHub; Write-Host "`nInfra ready. Now run each module's run.ps1 or follow its README. Pause when idle: setup.ps1 -Action pause" -ForegroundColor Magenta }
+    "pause"       { Set-Capacity "pause" }
+    "resume"      { Set-Capacity "resume" }
+    "status"      { Set-Capacity "status" }
+    "teardown"    { Invoke-Teardown }
 }

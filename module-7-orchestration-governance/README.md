@@ -1,8 +1,10 @@
-# Module 6 — Orchestration, Governance & Security
+# Module 7 — Orchestration, Governance & Security
 
 **Story chapter:** *"Run Contoso's estate safely at scale"*
 
 ~15–18 min · Mix of **live build** (pipeline/dataflow) and **show-and-tell** (domains, Purview, security).
+
+> **UI-only module** — no `run.ps1`. Pipelines, dataflows, domains, Purview, and network security are portal/admin features. Follow the steps below.
 
 ---
 
@@ -10,7 +12,7 @@
 
 | Before | This module | After |
 | --- | --- | --- |
-| Batch + streaming + BI built ad hoc | **Repeatable** ingestion + **governed** sharing | Module 7 ships changes via Git/pipelines |
+| Batch + streaming + BI built ad hoc | **Repeatable** ingestion + **governed** sharing | Module 8 ships changes via Git/pipelines |
 
 Contoso now has lakehouse gold, warehouse tables, mirrored orders, Direct Lake reports, and live telemetry. Enterprise IT asks: *Who owns Retail data? How do we label confidential reports? How does Spark reach private Azure SQL without public internet?*
 
@@ -65,11 +67,11 @@ Contoso now has lakehouse gold, warehouse tables, mirrored orders, Direct Lake r
 
 ---
 
-## Checklist → Module 7
+## Checklist → Module 8
 
 - [ ] Pipeline: copy → notebook
 - [ ] Dataflow Gen2 with Power Query steps
 - [ ] Domain, sensitivity label, lineage view
 - [ ] Workspace identity + Trusted Access / MPE explained
 
-**Next:** [`module-7-alm-capacity/`](../module-7-alm-capacity/README.md) — ship to Test/Prod and read the CU meter.
+**Next:** [`module-8-alm-capacity/`](../module-8-alm-capacity/README.md) — ship to Test/Prod and read the CU meter.

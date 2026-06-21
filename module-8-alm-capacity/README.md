@@ -1,8 +1,10 @@
-# Module 7 — ALM & Capacity
+# Module 8 — ALM & Capacity
 
 **Story chapter:** *"Ship changes safely — and watch the meter"*
 
 ~10 min · Mostly **show-and-tell** (Git, deployment pipelines, capacity metrics).
+
+> **UI-only module** — no `run.ps1`. Git integration, deployment pipelines, and the Capacity Metrics app are portal features. Follow the steps below.
 
 ---
 
@@ -10,7 +12,7 @@
 
 | Before | This module | After |
 | --- | --- | --- |
-| Everything built in Dev workspace | **Promote** to Test with rules | Module 8 adds AI on governed gold |
+| Everything built in Dev workspace | **Promote** to Test with rules | Module 9 adds AI on governed gold |
 
 Contoso's platform team needs **Dev/Test/Prod** discipline and visibility into **capacity units (CUs)** — especially after a demo week of Spark notebooks, pipeline runs, and report refreshes.
 
@@ -65,10 +67,10 @@ pwsh module-0-setup/setup.ps1 -Action pause   # stop billing
 
 ---
 
-## Checklist → Module 8 (optional)
+## Checklist → Module 9 (optional)
 
 - [ ] Git commit from workspace
 - [ ] Dev → Test deploy with a rule
 - [ ] Capacity Metrics app opened
 
-**Next:** [`module-8-ai-agents-copilot/`](../module-8-ai-agents-copilot/README.md) — *"Ask Contoso's gold layer a question in English."*
+**Next:** [`module-9-ai-agents-copilot/`](../module-9-ai-agents-copilot/README.md) — *"Ask Contoso's gold layer a question in English."*
