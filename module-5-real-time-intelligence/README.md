@@ -19,19 +19,20 @@
 Contoso's stores have IoT sensors: **freezer** temperature, **HVAC**, **foot traffic**, **checkout queue** depth. A freezer failure can't wait for tomorrow's POS export. **Real-Time Intelligence** ingests events, stores them in **Eventhouse**, dashboards them in seconds, and **Activator** pings Teams when thresholds breach.
 
 ```
-telemetry.ndjson → Eventstream → Eventhouse (KQL) → Real-Time Dashboard
-                                      │
-                                      └── Activator → Teams / email alert
+Event Hub → Eventstream → Eventhouse (KQL) → Real-Time Dashboard
+                              │
+                              └── Activator → Teams / email alert
 ```
 
-Sample events: `module-0-setup/data/telemetry.ndjson`.
+Sample events live in `module-0-setup/data/telemetry.ndjson`; `setup.ps1 -Action send-events` streams them into the Event Hub.
 
 ---
 
 ## 5.1 Prepare KQL table
 
-1. Open **`eh_telemetry`** eventhouse → KQL database **`eh_telemetry`**.
-2. Run **`eventhouse_setup.kql`** — creates `StoreTelemetry` + JSON mapping `telemetry_map`.
+1. **Create the eventhouse** (if it doesn't exist yet): workspace → **+ New item → Eventhouse** → name **`eh_telemetry`** → **Create** (this also creates a KQL database of the same name). *(Already exists if you ran `module-5-real-time-intelligence/run.ps1`.)*
+2. Open the **`eh_telemetry`** KQL database → **New → KQL queryset**.
+3. Run **`eventhouse_setup.kql`** — creates `StoreTelemetry` + JSON mapping `telemetry_map`.
 
 ---
 
@@ -48,7 +49,7 @@ Sample events: `module-0-setup/data/telemetry.ndjson`.
    ```
    Watch them flow Event Hub → Eventstream → Eventhouse in the live preview.
 
-**Say:** *"Eventstream = no-code routing, filtering, windowing, pulling from a real Azure Event Hub. Same platform as batch — not a separate stack to wire up."*
+Eventstream provides no-code routing, filtering, and windowing over a real Azure Event Hub source — on the same platform as the batch work, not a separate stack.
 
 ---
 
@@ -89,11 +90,31 @@ pwsh module-0-setup/setup.ps1 -Action send-events     # streams freezer readings
 ```
 A breaching reading flows Event Hub → Eventstream → Activator → **your Teams/email** within seconds. Open the rule's **Activation history** to show what tripped it and the property value at that moment.
 
-**Say:** *"Sub-second detection on live data → an action, with zero polling code. Per-store objects, time-window conditions, and any action target. Pair with the Module 9 Operations agent for natural-language diagnostics over the same stream."*
+Activator gives sub-second detection on live data with no polling code: per-store objects, time-window conditions, and any action target. It pairs with the Module 9 Operations agent for natural-language diagnostics over the same stream.
 
 > **Why it's not in `run.ps1`:** Activator objects/rules are authored in the portal (the binding of stream→object→property→action is a visual experience). The stream + data it reacts to **are** scripted (`send-events`).
 
 > **Copilot:** KQL queryset → NL to KQL. Module 9 for the Operations agent.
+
+---
+
+## 5.5 Zero-copy shortcut to the live stream (the federation headline)
+
+This is where **shortcuts** finally shine — over **changing** data, not a static copy. The lakehouse reads the eventhouse's live telemetry *in place*, and the row count grows as events arrive.
+
+1. In the **`eh_telemetry`** KQL database, enable **OneLake availability** (database → policies, or the table's **OneLake** toggle). The `StoreTelemetry` table is now mirrored to OneLake as Delta.
+2. In **`lh_retail`** → **Tables** → **New shortcut → Microsoft OneLake** → select the `eh_telemetry` KQL database → **`StoreTelemetry`**.
+3. Query the shortcut from the lakehouse SQL analytics endpoint (or a notebook):
+   ```sql
+   SELECT COUNT(*) AS rows, MAX(event_ts) AS latest FROM StoreTelemetry;
+   ```
+4. Stream more events and re-query:
+   ```powershell
+   pwsh module-0-setup/setup.ps1 -Action send-events
+   ```
+   The **count climbs through the shortcut** — no copy, no pipeline, no refresh. That is "don't move data, point at it," made visible in real time.
+
+This is the demo's zero-copy shortcut moment — the same OneLake shortcut feature, shown over **live** data so the "point at it, don't copy it" story is obvious.
 
 ---
 
@@ -113,5 +134,6 @@ A breaching reading flows Event Hub → Eventstream → Activator → **your Tea
 - [ ] Events flowing Eventstream → Eventhouse
 - [ ] Live dashboard tile
 - [ ] Activator fired on threshold breach
+- [ ] Shortcut over the live KQL table — row count grows through the pointer (§5.5)
 
 **Next:** [`module-6-machine-learning/`](../module-6-machine-learning/README.md) — train + score an ML model on the gold layer.

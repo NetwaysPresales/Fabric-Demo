@@ -31,7 +31,7 @@ Our demo env: **F4, UAE North** — confirm toggles before Module 9 live.
 
 ---
 
-## 8.1 Copilot woven through Fabric (callbacks to earlier modules)
+## 9.1 Copilot woven through Fabric (callbacks to earlier modules)
 
 | Surface | Where we already saw it | Try saying |
 | --- | --- | --- |
@@ -40,11 +40,11 @@ Our demo env: **F4, UAE North** — confirm toggles before Module 9 live.
 | **Power BI** | Module 4 | *"Create regional sales page"* |
 | **KQL** | Module 5 | NL → KQL for freezer breaches |
 
-**Say:** *"Same governance — Copilot reads items you already secured in OneLake."*
+Governance is unchanged — Copilot reads the same OneLake items already secured.
 
 ---
 
-## 8.2 Fabric Data Agent — NL over YOUR data
+## 9.2 Fabric Data Agent — NL over YOUR data
 
 Answers business questions over lakehouse / warehouse / semantic model → publish to Teams / Copilot Studio.
 
@@ -54,18 +54,18 @@ Answers business questions over lakehouse / warehouse / semantic model → publi
 4. Ask: *"Which region had highest net sales?"* / *"Top 5 categories by units?"*
 5. **Publish** → Teams / Copilot Studio.
 
-**Say:** *"Grounded Q&A on gold — not a generic ChatGPT. This is the 'talk to your data product' moment."*
+This is grounded Q&A over the gold layer — not a generic chatbot — i.e. querying a governed data product directly.
 
 ---
 
-## 8.3 Power BI agent
+## 9.3 Power BI agent
 
 - Open **`rpt_retail_overview`** → **Copilot** → *"What's driving North region sales?"*
 - Self-service NL on the **Direct Lake semantic model** from Module 4.
 
 ---
 
-## 8.4 Operations agent (Real-Time, preview)
+## 9.4 Operations agent (Real-Time, preview)
 
 - Eventhouse / Real-Time hub → agent experience.
 - *"Which stores breached freezer threshold in the last hour?"*
@@ -73,7 +73,7 @@ Answers business questions over lakehouse / warehouse / semantic model → publi
 
 ---
 
-## 8.5 Future outlook (mention)
+## 9.5 Future outlook (mention)
 
 | Direction | Meaning |
 | --- | --- |

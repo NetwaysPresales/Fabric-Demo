@@ -16,7 +16,7 @@ We **ingest the blob files with a Copy job into OneLake** (orchestrated visually
 
 ```
 Azure Blob Storage (raw CSVs)
-        │  Copy job  (inside a Fabric Task flow: Get data → Store → Transform → Serve)
+        │  Copy job  (mapped in a hand-built Fabric Task flow: Get data → Store data → Prepare data → … → Govern data)
         ▼
    Files/bronze ─► bronze ─► Silver ─► Gold ──► wh_retail (T-SQL)
       (Module 1, notebooks)      │        │              │
@@ -32,7 +32,7 @@ Orchestration · Domains · Purview · Security  (Module 7)
 Git · Deployment Pipelines · Capacity metrics  (Module 8)
 ```
 
-> **Ingestion story (Module 1):** raw files live in **Blob Storage**, not pre-loaded into the lakehouse. A **Copy job** pulls them into `lh_retail` `Files/bronze`, and a **Task flow** gives the workspace a visual Get-data → Store → Transform → Serve map. (The storage account + upload are scripted; the Copy job and Task flow are built live in the portal.)
+> **Ingestion story (Module 1):** raw files live in **Blob Storage**, not pre-loaded into the lakehouse. A **Copy job** pulls them into `lh_retail` `Files/bronze`, and a hand-built **Task flow** maps the whole demo (Get data → Mirror data → Store data → Prepare data → Analyze and train data → Develop data → Visualize data → Track data → Distribute data → Govern data). (The storage account + upload are scripted; the Copy job and Task flow are built live in the portal.)
 
 **One sentence for the room:** *One copy of data in OneLake, every engine, one governance model.*
 
@@ -60,7 +60,7 @@ Git · Deployment Pipelines · Capacity metrics  (Module 8)
 
 ## Notebooks (Module 1)
 
-Each notebook has **detailed markdown cells** — story context, step explanations, presenter notes, and success criteria. Run in order:
+Each notebook has **detailed markdown cells** — story context, step-by-step explanations, and success criteria. Run in order:
 
 | Notebook | Story beat |
 | --- | --- |
@@ -69,8 +69,6 @@ Each notebook has **detailed markdown cells** — story context, step explanatio
 | `02_silver_transform` | Clean, dimensional model, V-Order |
 | `03_gold_aggregate` | Business KPI tables for BI |
 | `04_vorder_demo` | Prove V-Order size/speed benefit |
-| `05_shortcuts` | Zero-copy federation (UI preferred on stage) |
-| `06_cross_engine_reads` | Capstone — Spark, SQL, Power BI, mirroring |
 
 Uploaded + run by `pwsh module-1-onelake-lakehouse/run.ps1`, or import manually from `module-1-onelake-lakehouse/`.
 
@@ -114,6 +112,6 @@ pwsh module-0-setup/setup.ps1 -Action pause    # stop billing when idle (resume 
 | --- | --- |
 | `.env.example` / `.env` | Configuration (`.env` is git-ignored) |
 | `module-0-setup/` | Setup guide + `setup.ps1` + sample data |
-| `module-1..8-*/` | One folder per story chapter: README + assets |
+| `module-1..9-*/` | One folder per story chapter: README + assets |
 
 > A paid Fabric capacity **bills while active** — always `pwsh module-0-setup/setup.ps1 -Action pause` when you stop. A 60-day Fabric trial is a free alternative.

@@ -14,7 +14,7 @@
 
 | Before | This module | After |
 | --- | --- | --- |
-| Batch POS data in lakehouse gold | Live **order app** on Fabric SQL DB | Mirrored Delta in OneLake; notebook `06` can blend orders + sales |
+| Batch POS data in lakehouse gold | Live **order app** on Fabric SQL DB | Mirrored Delta in OneLake; can be blended with gold in a notebook |
 
 Contoso's e-commerce team runs an **order-management app** against **`sqldb_orders`**. Finance and ops want those orders in the **same analytical estate** as POS sales — without a fragile nightly sync job.
 
@@ -24,10 +24,10 @@ Contoso's e-commerce team runs an **order-management app** against **`sqldb_orde
 
 ## 3.1 Create the operational schema
 
-1. Open **`sqldb_orders`** → **New query**.
+1. **Create the SQL database** (if it doesn't exist yet): workspace → **+ New item → SQL database** → name **`sqldb_orders`** → **Create**. *(Already exists if you ran `module-3-sql-database-mirroring/run.ps1`.)* Then open it → **New query**.
 2. Paste **`oltp_seed.sql`** → run the **schema** section once (`dbo.Orders`, `dbo.OrderItems`).
 
-**Say:** *"Real OLTP — IDENTITY columns, defaults, ACID. This is the app database, not a warehouse."*
+This is a real OLTP engine — IDENTITY columns, defaults, ACID — i.e. an application database, not a warehouse.
 
 ---
 
@@ -38,9 +38,9 @@ Contoso's e-commerce team runs an **order-management app** against **`sqldb_orde
 3. Switch to **SQL analytics endpoint** of the same database (or open the mirrored endpoint item).
 4. Same query — rows appear as **Delta in OneLake** within ~30s.
 
-**Say:** *"Translytical — app writes here, analysts query there, same truth, no pipeline schedule."*
+Translytical: the app writes here while analysts query the mirrored copy — one source of truth, no pipeline schedule.
 
-Optional: create a **shortcut** in `lh_retail` → `Files/orders_shortcut` → run notebook `06` cell 2.
+Optional (translytical blend): create a **shortcut** in `lh_retail` → `Files/orders_shortcut` to the mirrored `Orders`, then read it in a notebook and join to `gold.sales_by_store_day` — POS batch + live orders in one Spark session, zero copy.
 
 ---
 
@@ -49,7 +49,7 @@ Optional: create a **shortcut** in `lh_retail` → `Files/orders_shortcut` → r
 1. **`sqldb_orders`** → **Replication / Mirroring** (or Monitor replication).
 2. Status = **Running**, all tables mirrored.
 
-**Say:** *"~30s SLO, free mirror compute. GraphQL, schema Git, deployment pipelines — real app backend."*
+~30s mirroring SLO with free mirror compute; combined with GraphQL, schema source control, and deployment-pipeline support, it serves as a real application backend.
 
 > **Copilot:** SQL editor completion + NL-to-SQL. Module 9 for agents.
 

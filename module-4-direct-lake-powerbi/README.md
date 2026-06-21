@@ -28,7 +28,7 @@ Contoso's leadership wants **regional sales dashboards** that refresh when store
    Net Sales = SUM(sales_by_store_day[net_sales])
    ```
 
-**Say:** *"Data came straight from OneLake Delta — no import job, no DirectQuery SQL round-trip per visual."*
+Data is read straight from OneLake Delta — no import job and no per-visual DirectQuery round-trip.
 
 > **Copilot / Power BI agent:** *"Create a page summarizing net sales by region"*. Module 9 expands this.
 
@@ -62,11 +62,11 @@ Add view to model → visuals using it fall back.
 
 Model **Settings** → **Direct Lake behavior**:
 
-| Mode | Behavior |
-| --- | --- |
-| `Automatic` | Direct Lake; silent fallback | Production |
-| `DirectLakeOnly` | Error on violation | Prove fallback in dev |
-| `DirectQueryOnly` | Always SQL | Troubleshooting |
+| Mode | Behavior | Use when |
+| --- | --- | --- |
+| `Automatic` | Direct Lake; silent fallback to DirectQuery | Production |
+| `DirectLakeOnly` | Errors instead of falling back | Prove you stayed in Direct Lake |
+| `DirectQueryOnly` | Always DirectQuery | Troubleshooting / baseline |
 
 Set **`DirectLakeOnly`** on view visual → error → back to **`Automatic`** → renders via fallback.
 

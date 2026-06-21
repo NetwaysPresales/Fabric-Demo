@@ -37,19 +37,19 @@ Fabric gives both — without duplicating the Delta files.
    DELETE FROM gold.sales_by_category;   -- errors: endpoint is read-only
    ```
 
-**Say:** *"Analysts get T-SQL on Spark output. All writes stay in notebooks — intentional separation."*
+Analysts get T-SQL over Spark output; all writes stay in notebooks — an intentional read/write separation.
 
 ---
 
 ## 2.2 Warehouse — full T-SQL + cross-item joins
 
-1. Open **`wh_retail`** → **New SQL query**.
+1. **Create the warehouse** (if it doesn't exist yet): workspace → **+ New item → Warehouse** → name **`wh_retail`** → **Create**. *(Already exists if you ran `module-2-warehouse-vs-lakehouse/run.ps1`.)* Then open it → **New SQL query**.
 2. Paste and run **`warehouse_ddl.sql`**:
    - Builds `dbo.dim_store`, `dbo.fact_sales_daily` from **`lh_retail.gold.sales_by_store_day`** (three-part name — cross-item, zero copy)
    - Runs a **multi-table ACID transaction** (lakehouse endpoint cannot)
 3. Run **`cross_query.sql`** — joins warehouse table to lakehouse table in one query.
 
-**Say:** *"Warehouse = SQL devs: DDL, DML, stored procs, V-Order by default. Same Delta underneath."*
+The warehouse targets SQL developers: full DDL/DML, stored procedures, and V-Order by default — over the same Delta files underneath.
 
 > **Copilot:** SQL editor → autocomplete or *"generate top categories by net sales"*. Module 9 for full agent tour.
 
@@ -63,7 +63,7 @@ Fabric gives both — without duplicating the Delta files.
 | T-SQL, transactions, BI serving at scale | **Warehouse** |
 | Both on same data | **Both** — one OneLake copy |
 
-Also query **`gold.sales_by_region`** from notebook `06`:
+Also query **`gold.sales_by_region`** (built in notebook `03`):
 ```sql
 SELECT * FROM lh_retail.gold.sales_by_region;
 ```

@@ -87,7 +87,7 @@ pwsh module-0-setup/setup.ps1 -Action pause      # resume | status
 
 | Module | `run.ps1`? | What the code path does |
 | --- | --- | --- |
-| 1 — Lakehouse | ✅ | Create lakehouse, upload CSVs→`Files/bronze`, upload + run notebooks `00`–`06` |
+| 1 — Lakehouse | ✅ | Create lakehouse, upload CSVs→`Files/bronze`, upload + run notebooks `00`–`04` |
 | 2 — Warehouse | ✅ | Create warehouse, run `warehouse_ddl.sql` + `cross_query.sql` |
 | 3 — SQL DB + mirroring | ✅ | Create SQL DB, run `oltp_seed.sql` (mirrors automatically) |
 | 6 — Machine Learning | ✅ | Train + MLflow-log a model on gold, register, score, write predictions back |

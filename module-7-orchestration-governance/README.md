@@ -18,28 +18,28 @@ Contoso now has lakehouse gold, warehouse tables, mirrored orders, Direct Lake r
 
 ---
 
-## 6.1 Data Pipeline — orchestration
+## 7.1 Data Pipeline — orchestration
 
 1. Open **`pl_ingest`** (or **+ New → Data pipeline**).
 2. **Copy data:** source = `Files/bronze` or HTTP CSV → destination = lakehouse table.
 3. **Notebook activity:** **`02_silver_transform`**.
 4. Connect **Copy → Notebook** (On success) → **Run**.
 
-**Say:** *"Copy = cheap bulk move. Pipeline = orchestration with If/ForEach/Wait. Notebooks/dataflows = business logic."*
+Copy is the cheap bulk mover; pipelines add orchestration (If/ForEach/Wait); notebooks and dataflows carry the business logic.
 
 ---
 
-## 6.2 Dataflow Gen2 — citizen transforms
+## 7.2 Dataflow Gen2 — citizen transforms
 
 1. **+ New → Dataflow Gen2** → **`df_clean`**.
 2. **Get data → CSV** → Power Query steps (types, trim, unpivot).
 3. Destination = **`lh_retail`** → **Publish**.
 
-**Say:** *"300+ transforms, friendly for analysts — but row-by-row costs more CU. Pair with pipelines."*
+Dataflow Gen2 offers 300+ analyst-friendly transforms, but row-by-row shaping costs more CU — pair it with pipelines for bulk movement.
 
 ---
 
-## 6.3 Governance (show-and-tell)
+## 7.3 Governance (show-and-tell)
 
 | Topic | Demo | Narrative |
 | --- | --- | --- |
@@ -50,7 +50,7 @@ Contoso now has lakehouse gold, warehouse tables, mirrored orders, Direct Lake r
 
 ---
 
-## 6.4 Security & networking
+## 7.4 Security & networking
 
 ### Workspace identity (provisioned in Module 0)
 - **Workspace settings → Workspace identity** — Entra managed identity (no secrets in pipelines).
@@ -63,7 +63,30 @@ Contoso now has lakehouse gold, warehouse tables, mirrored orders, Direct Lake r
 - Spark/pipelines reach **private** Azure SQL/ADLS over Azure backbone.
 - Target owner approves Private Link in Azure portal.
 
-**Say:** *"Fabric is multi-tenant SaaS — enterprises use identity + private endpoints, not VPNs to 'the Fabric server'."*
+Fabric is multi-tenant SaaS: enterprises secure it with workspace identity and managed private endpoints, not a VPN to "the Fabric server".
+
+---
+
+## 7.5 Data security — OneLake roles & Row-Level Security
+
+The controls above are about *network* and *workspace* access. This is about *data*: **who sees which rows and columns.**
+
+### OneLake security (data access roles)
+1. Open **`lh_retail`** → **Manage OneLake data access (roles)** → **+ New role**.
+2. Grant the role read on specific **tables/folders** only (e.g. `gold` schema, not `bronze`), and assign users/groups.
+3. The rule is enforced across **every engine** that reads OneLake — Spark, the SQL analytics endpoint, and Direct Lake — so security is defined **once at the data layer**, not per tool. (Row/column-level rules at the OneLake layer are in preview.)
+
+### Row-Level Security (RLS) in the semantic model
+1. Open **`sm_retail_directlake`** → **Manage roles** → **+ New** → e.g. `Region Managers`.
+2. Filter `dim_store` with `[region] = <user's region>` (map via `USERPRINCIPALNAME()` / a mapping table).
+3. **View as role** to confirm a user sees only their region's rows.
+
+### RLS / CLS in the warehouse or SQL endpoint
+- `CREATE SECURITY POLICY` with an inline table-valued predicate function → table-level RLS in `wh_retail`.
+- Column-level security / dynamic data masking via `GRANT` and `MASKED WITH`.
+- Note: applying RLS at the SQL layer forces **Direct Lake → DirectQuery fallback** (the engine must evaluate the security context) — the tie-in to Module 4.
+
+**Defense in depth:** workspace roles (who gets in) → OneLake roles (which data) → RLS/CLS (which rows/columns) → Purview labels + DLP (how it's classified and shared).
 
 ---
 
@@ -73,5 +96,6 @@ Contoso now has lakehouse gold, warehouse tables, mirrored orders, Direct Lake r
 - [ ] Dataflow Gen2 with Power Query steps
 - [ ] Domain, sensitivity label, lineage view
 - [ ] Workspace identity + Trusted Access / MPE explained
+- [ ] OneLake data-access role + semantic-model RLS shown (§7.5)
 
 **Next:** [`module-8-alm-capacity/`](../module-8-alm-capacity/README.md) — ship to Test/Prod and read the CU meter.

@@ -3,7 +3,7 @@
     1. Create the lakehouse (schemas enabled) if missing.
     2. Upload the raw CSVs to Files/bronze (so the notebooks have input).
     3. Upload the notebooks (with the default lakehouse bound).
-    4. Run 00->06 headlessly and report pass/fail.
+    4. Run 00->04 headlessly and report pass/fail.
 
   Prereq: setup.ps1 -Action infra (workspace + storage + data must exist).
   Or just follow the UI steps in this folder's README instead.
@@ -16,7 +16,7 @@ param([switch]$SkipRun, [int]$TimeoutMinutes = 12)
 
 . "$PSScriptRoot/../module-0-setup/common.ps1"
 $NotebookDir = $PSScriptRoot
-$RunOrder = @("01_bronze_ingest","02_silver_transform","03_gold_aggregate","04_vorder_demo","05_shortcuts","06_cross_engine_reads")
+$RunOrder = @("01_bronze_ingest","02_silver_transform","03_gold_aggregate","04_vorder_demo")
 
 $cfg = Import-DotEnv
 $h = Get-FabricHeaders
@@ -62,7 +62,7 @@ Write-Host "[ok] default lakehouse '$($cfg.LAKEHOUSE_NAME)' bound into each note
 if ($SkipRun) { Write-Host "`n-SkipRun set. Open the notebooks in Fabric and run them, or re-run without -SkipRun." -ForegroundColor Magenta; return }
 
 # 4. Run notebooks headlessly
-Write-Host "== Run notebooks (00 -> 06) ==" -ForegroundColor Cyan
+Write-Host "== Run notebooks (00 -> 04) ==" -ForegroundColor Cyan
 Start-Sleep 5   # let the just-created notebooks register
 $all = (Invoke-FabricGet "workspaces/$wsId/notebooks" $h).value
 $results = @()

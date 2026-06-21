@@ -1,0 +1,35 @@
+{
+  "name": "Contoso Retail — Demo Flow",
+  "tasks": [
+    { "type": "get data",               "id": "b7c1e0a1-0001-4a10-8b21-000000000001", "name": "Ingest batch — Copy job (blob → bronze)" },
+    { "type": "mirror data",            "id": "b7c1e0a1-0002-4a10-8b21-000000000002", "name": "Mirror — sqldb_orders" },
+    { "type": "store data",             "id": "b7c1e0a1-0003-4a10-8b21-000000000003", "name": "OneLake lakehouse — lh_retail" },
+    { "type": "prepare data",           "id": "b7c1e0a1-0004-4a10-8b21-000000000004", "name": "Medallion — notebooks + Dataflow Gen2" },
+    { "type": "analyze and train data", "id": "b7c1e0a1-0005-4a10-8b21-000000000005", "name": "ML — sales forecast (MLflow)" },
+    { "type": "develop",                "id": "b7c1e0a1-0006-4a10-8b21-000000000006", "name": "Warehouse — wh_retail" },
+    { "type": "visualize",              "id": "b7c1e0a1-0007-4a10-8b21-000000000007", "name": "Power BI — Direct Lake report" },
+    { "type": "get data",               "id": "b7c1e0a1-0008-4a10-8b21-000000000008", "name": "Ingest stream — Eventstream (from Event Hub)" },
+    { "type": "store data",             "id": "b7c1e0a1-0009-4a10-8b21-000000000009", "name": "Eventhouse — eh_telemetry (KQL)" },
+    { "type": "visualize",              "id": "b7c1e0a1-000a-4a10-8b21-00000000000a", "name": "Real-Time Dashboard — rtd_stores" },
+    { "type": "track data",             "id": "b7c1e0a1-000b-4a10-8b21-00000000000b", "name": "Activator + Capacity metrics" },
+    { "type": "distribute data",        "id": "b7c1e0a1-000c-4a10-8b21-00000000000c", "name": "Data agent + deployment pipeline" },
+    { "type": "govern data",            "id": "b7c1e0a1-000d-4a10-8b21-00000000000d", "name": "Domains + Purview + OneLake security" }
+  ],
+  "edges": [
+    { "source": "b7c1e0a1-0001-4a10-8b21-000000000001", "target": "b7c1e0a1-0003-4a10-8b21-000000000003" },
+    { "source": "b7c1e0a1-0002-4a10-8b21-000000000002", "target": "b7c1e0a1-0003-4a10-8b21-000000000003" },
+    { "source": "b7c1e0a1-0003-4a10-8b21-000000000003", "target": "b7c1e0a1-0004-4a10-8b21-000000000004" },
+    { "source": "b7c1e0a1-0004-4a10-8b21-000000000004", "target": "b7c1e0a1-0005-4a10-8b21-000000000005" },
+    { "source": "b7c1e0a1-0004-4a10-8b21-000000000004", "target": "b7c1e0a1-0006-4a10-8b21-000000000006" },
+    { "source": "b7c1e0a1-0004-4a10-8b21-000000000004", "target": "b7c1e0a1-0007-4a10-8b21-000000000007" },
+    { "source": "b7c1e0a1-0005-4a10-8b21-000000000005", "target": "b7c1e0a1-0007-4a10-8b21-000000000007" },
+    { "source": "b7c1e0a1-0006-4a10-8b21-000000000006", "target": "b7c1e0a1-0007-4a10-8b21-000000000007" },
+    { "source": "b7c1e0a1-0008-4a10-8b21-000000000008", "target": "b7c1e0a1-0009-4a10-8b21-000000000009" },
+    { "source": "b7c1e0a1-0009-4a10-8b21-000000000009", "target": "b7c1e0a1-000a-4a10-8b21-00000000000a" },
+    { "source": "b7c1e0a1-0009-4a10-8b21-000000000009", "target": "b7c1e0a1-000b-4a10-8b21-00000000000b" },
+    { "source": "b7c1e0a1-0007-4a10-8b21-000000000007", "target": "b7c1e0a1-000c-4a10-8b21-00000000000c" },
+    { "source": "b7c1e0a1-000a-4a10-8b21-00000000000a", "target": "b7c1e0a1-000c-4a10-8b21-00000000000c" },
+    { "source": "b7c1e0a1-0003-4a10-8b21-000000000003", "target": "b7c1e0a1-000d-4a10-8b21-00000000000d" },
+    { "source": "b7c1e0a1-0009-4a10-8b21-000000000009", "target": "b7c1e0a1-000d-4a10-8b21-00000000000d" }
+  ]
+}

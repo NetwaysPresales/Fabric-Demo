@@ -41,7 +41,7 @@ gold.sales_by_store_day ─► features ─► train (sklearn + MLflow autolog)
 3. **Train + track** — `RandomForestRegressor` with **`mlflow.sklearn.autolog()`**; logs params/metrics and **registers** `retail_sales_forecaster`.
 4. **Score + write back** — predictions → **`gold.sales_predictions`** (Delta).
 
-**Say:** *"Same OneLake gold tables feed BI and ML. MLflow experiment + registry are native — no separate ML service. The output is just another gold table any engine or agent can read."*
+The same OneLake gold tables feed BI and ML. MLflow tracking and the model registry are native to Fabric — no separate ML service — and the scored output is just another gold table any engine or agent can read.
 
 ## 6.3 Show the artifacts (UI)
 

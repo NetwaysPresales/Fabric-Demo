@@ -18,28 +18,28 @@ Contoso's platform team needs **Dev/Test/Prod** discipline and visibility into *
 
 ---
 
-## 7.1 Git integration
+## 8.1 Git integration
 
 1. **Workspace settings → Git integration** → connect Azure DevOps or GitHub.
 2. Change something small (rename a measure) → **uncommitted change** badge.
 3. **Source control** → diff → **Commit**.
 
-**Say:** *"Feature workspaces per branch; limits: 1000 items, 25 MB/file. Same ALM story as app code."*
+Use feature workspaces per branch. Limits: 1,000 items per workspace, 25 MB/file. The ALM story mirrors application code.
 
 ---
 
-## 7.2 Deployment Pipeline
+## 8.2 Deployment Pipeline
 
 1. **Deployment pipelines → Create** → **`dp_retail`** (Dev / Test / Prod).
 2. Assign **`Fabric-Demo-Workshop`** → Dev, **`Fabric-Demo-Workshop-Test`** → Test.
 3. **Deploy** Dev → Test.
 4. **Deployment rule:** data-source rule swaps test/prod connections — Test never hits prod data.
 
-**Say:** *"Unassigning a stage erases history — caution in prod cutovers."*
+Unassigning a stage permanently erases its deployment history — use caution during production cutovers.
 
 ---
 
-## 7.3 Capacity Metrics app
+## 8.3 Capacity Metrics app
 
 1. Install **Microsoft Fabric Capacity Metrics** (AppSource, first time).
 2. Point at your capacity (e.g. `ntwfabricdemo` F4).
@@ -51,13 +51,11 @@ Contoso's platform team needs **Dev/Test/Prod** discipline and visibility into *
 | **Smoothing** | Interactive ~5 min; background 24h — absorbs spikes |
 | **Throttling** | Sustained debt → delay → reject (Metrics app) |
 
-**Say:** *"Pause dev capacity nights/weekends. F64 = free Power BI viewers cliff. OneLake storage bills separately."*
-
-Presenter deep dive: `presenter/info-and-faq.md` (if available locally).
+Pause dev capacity nights/weekends. F64 is the threshold where free Power BI viewers become possible. OneLake storage bills separately from compute.
 
 ---
 
-## 7.4 Wrap-up
+## 8.4 Wrap-up
 
 > *"One copy of data, every engine, one governance and lifecycle model. Everything sat on the same Delta files in OneLake."*
 
