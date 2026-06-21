@@ -16,6 +16,13 @@
 
 Contoso's platform team needs **Dev/Test/Prod** discipline and visibility into **capacity units (CUs)** — especially after a demo week of Spark notebooks, pipeline runs, and report refreshes.
 
+```mermaid
+flowchart LR
+  Repo["Azure DevOps / GitHub"] <-->|"Git sync"| WS["Dev workspace"]
+  WS -->|"Deployment pipeline<br/>(data-source rules)"| Test["Test"] --> Prod["Prod"]
+  WS -. "CU usage" .-> CM["Capacity Metrics app<br/>(smoothing · throttling)"]
+```
+
 ---
 
 ## 8.1 Git integration

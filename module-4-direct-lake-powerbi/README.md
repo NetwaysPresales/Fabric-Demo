@@ -16,6 +16,13 @@
 
 Contoso's leadership wants **regional sales dashboards** that refresh when stores close — not tomorrow morning after an import job. **Direct Lake** loads parquet from OneLake into the Analysis Services engine like Import, but data stays live like DirectQuery — **no duplicate semantic copy, no scheduled refresh**.
 
+```mermaid
+flowchart LR
+  G["gold Delta<br/>(OneLake)"] -->|"Direct Lake (no copy)"| M["sm_retail_directlake<br/>semantic model"]
+  M --> R["rpt_retail_overview<br/>Power BI report"]
+  M -. "view / RLS / memory limit" .-> DQ["DirectQuery fallback"]
+```
+
 ---
 
 ## 4.1 Build Direct Lake semantic model

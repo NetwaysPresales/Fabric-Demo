@@ -23,6 +23,13 @@ Contoso has **two types of SQL users**:
 
 Fabric gives both — without duplicating the Delta files.
 
+```mermaid
+flowchart LR
+  G["gold Delta<br/>in OneLake"] --> EP["Lakehouse SQL endpoint<br/>(read-only T-SQL)"]
+  G --> WH["wh_retail warehouse<br/>(full T-SQL, ACID)"]
+  WH -. "cross-item join<br/>(3-part name)" .-> G
+```
+
 ---
 
 ## 2.1 Lakehouse SQL analytics endpoint (read-only)

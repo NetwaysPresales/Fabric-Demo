@@ -24,12 +24,12 @@ Read this **first**. It explains the split between **infrastructure** (one scrip
 
 ## What `setup.ps1` provisions
 
-```
-Resource group
- ├─ Fabric capacity (F4)         → the compute
- │   └─ Workspace               → the shared container for every module
- ├─ Blob Storage account        → raw CSVs (source for Module 1's Copy job)
- └─ Event Hubs namespace + hub  → live telemetry source (Module 5)
+```mermaid
+flowchart TD
+  RG["Resource group"] --> CAP["Fabric capacity (F4)<br/>the compute"]
+  CAP --> WS["Workspace<br/>shared container for every module"]
+  RG --> ST["Blob Storage account<br/>raw CSVs — Module 1 Copy job source"]
+  RG --> EH["Event Hubs namespace + hub<br/>live telemetry — Module 5"]
 ```
 
 | `.env` item | Default |

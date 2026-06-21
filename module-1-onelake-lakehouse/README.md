@@ -20,6 +20,14 @@
 
 Contoso's POS systems drop three CSV files every night. We land them in **bronze** (raw), conform them in **silver** (dimensions + facts + V-Order), and publish **gold** KPI tables that the rest of the demo consumes — **without ever copying data out of OneLake**.
 
+```mermaid
+flowchart LR
+  Blob[("Azure Blob<br/>retail-raw/bronze")] -->|"Copy job"| F["lh_retail<br/>Files/bronze (CSV)"]
+  F -->|"01 bronze ingest"| B["bronze.*<br/>(raw Delta)"]
+  B -->|"02 silver transform"| S["silver dims + fact<br/>(+ V-Order)"]
+  S -->|"03 gold aggregate"| G["gold.sales_by_*<br/>(BI-ready)"]
+```
+
 ---
 
 ## Notebooks (run in order)

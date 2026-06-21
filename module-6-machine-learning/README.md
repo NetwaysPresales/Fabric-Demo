@@ -19,12 +19,12 @@
 
 Contoso's BI shows yesterday's sales. The next question is forward-looking: *"What will each store sell tomorrow?"* Fabric is a **full data-science platform** — built-in **MLflow** tracking + **model registry**, Spark/sklearn/SynapseML — so we train on the **same gold tables** the report uses, with no data leaving OneLake.
 
-```
-gold.sales_by_store_day ─► features ─► train (sklearn + MLflow autolog)
-                                          │
-                                          ├─► Experiment: retail-sales-forecast
-                                          ├─► Registered model: retail_sales_forecaster
-                                          └─► gold.sales_predictions (Delta, scored)
+```mermaid
+flowchart LR
+  G["gold.sales_by_store_day"] --> FE["features<br/>(dow, region, units)"] --> TR["train RandomForest<br/>(MLflow autolog)"]
+  TR --> EXP["Experiment<br/>retail-sales-forecast"]
+  TR --> REG["Registered model<br/>retail_sales_forecaster"]
+  TR --> PR["gold.sales_predictions<br/>(Delta, scored)"]
 ```
 
 ---

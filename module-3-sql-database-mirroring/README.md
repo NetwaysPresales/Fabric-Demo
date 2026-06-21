@@ -20,6 +20,13 @@ Contoso's e-commerce team runs an **order-management app** against **`sqldb_orde
 
 **Mirroring** copies committed OLTP changes to Delta in OneLake within ~**30 seconds**. Mirroring compute is **free**; you pay storage + query compute.
 
+```mermaid
+flowchart LR
+  App["Order app / INSERTs"] -->|"writes"| SQL["sqldb_orders<br/>(OLTP, ACID)"]
+  SQL -. "auto-mirror ~30s (free)" .-> D["OneLake Delta"]
+  D --> EP["SQL analytics endpoint<br/>(read-only) + Power BI"]
+```
+
 ---
 
 ## 3.1 Create the operational schema

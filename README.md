@@ -14,22 +14,22 @@ A follow-along tour of Microsoft Fabric for a technical audience (data engineers
 
 We **ingest the blob files with a Copy job into OneLake** (orchestrated visually with a **Task flow**), refine them through a **medallion lakehouse**, serve SQL personas via a **warehouse**, give executives **Direct Lake Power BI**, react to live events with **Real-Time Intelligence**, train an **ML model** on the gold layer, and govern the estate with **Purview, Git, and deployment pipelines**. Module 9 adds **Copilot and agents** on top of everything we built.
 
-```
-Azure Blob Storage (raw CSVs)
-        │  Copy job  (mapped in a hand-built Fabric Task flow: Get data → Store data → Prepare data → … → Govern data)
-        ▼
-   Files/bronze ─► bronze ─► Silver ─► Gold ──► wh_retail (T-SQL)
-      (Module 1, notebooks)      │        │              │
-                                 │        └──────► Direct Lake ──► Power BI  (Module 4)
-                                 │
-   sqldb_orders (OLTP) ──auto-mirror ~30s──► OneLake Delta  (Module 3)
-
-Store telemetry ──► Eventstream ──► Eventhouse ──► Dashboard + Activator  (Module 5)
-                                                      │
-ML model on gold (train · MLflow · score)            └── Operations agent  (Module 9)
-                              (Module 6)
-Orchestration · Domains · Purview · Security  (Module 7)
-Git · Deployment Pipelines · Capacity metrics  (Module 8)
+```mermaid
+flowchart LR
+  Blob[("Azure Blob<br/>raw CSVs")] -->|"Copy job"| Bronze
+  SQLDB[("sqldb_orders<br/>OLTP")] -. "auto-mirror ~30s" .-> Gold
+  subgraph M1["Module 1 · lh_retail medallion"]
+    Bronze --> Silver --> Gold["gold<br/>data products"]
+  end
+  Gold --> WH["Module 2<br/>wh_retail warehouse"]
+  Gold --> DL["Module 4<br/>Direct Lake → Power BI"]
+  Gold --> ML["Module 6<br/>ML forecast (MLflow)"]
+  EH[("Event Hub")] -->|"Eventstream"| KQL["Module 5<br/>Eventhouse (KQL)"]
+  KQL --> RTD["Real-Time Dashboard"]
+  KQL --> ACT["Activator → Teams"]
+  Gold --> AG["Module 9<br/>Data Agent / Copilot"]
+  Gold -. "governed by" .-> GOV["Module 7<br/>Domains · Purview · Security"]
+  WH -. "shipped via" .-> ALM["Module 8<br/>Git · Deploy · Capacity"]
 ```
 
 > **Ingestion story (Module 1):** raw files live in **Blob Storage**, not pre-loaded into the lakehouse. A **Copy job** pulls them into `lh_retail` `Files/bronze`, and a hand-built **Task flow** maps the whole demo (Get data → Mirror data → Store data → Prepare data → Analyze and train data → Develop data → Visualize data → Track data → Distribute data → Govern data). (The storage account + upload are scripted; the Copy job and Task flow are built live in the portal.)

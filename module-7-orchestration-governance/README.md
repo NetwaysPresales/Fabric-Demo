@@ -16,6 +16,13 @@
 
 Contoso now has lakehouse gold, warehouse tables, mirrored orders, Direct Lake reports, and live telemetry. Enterprise IT asks: *Who owns Retail data? How do we label confidential reports? How does Spark reach private Azure SQL without public internet?*
 
+```mermaid
+flowchart LR
+  E["Fabric estate<br/>(all modules' items)"] --> O["Orchestrate<br/>pipelines + dataflows"]
+  E --> G["Govern<br/>Domains · Purview · lineage"]
+  E --> S["Secure<br/>workspace identity · MPE<br/>OneLake roles + RLS/CLS"]
+```
+
 ---
 
 ## 7.1 Data Pipeline — orchestration

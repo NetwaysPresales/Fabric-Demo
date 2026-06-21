@@ -16,6 +16,16 @@
 
 We've shown Contoso's **data estate**. Now we show the **AI layer**: same OneLake items, same Purview labels, same capacity — but natural language for builders (Copilot) and consumers (Data Agent, Power BI agent, Operations agent).
 
+```mermaid
+flowchart LR
+  G["gold tables"] --> DA["retail_data_agent<br/>(Data Agent)"]
+  M["semantic model"] --> PBI["Power BI agent"]
+  KQL["eventhouse (live)"] --> OPS["Operations agent"]
+  DA --> NL["Natural-language Q&A<br/>(Teams / Copilot Studio)"]
+  PBI --> NL
+  OPS --> NL
+```
+
 ---
 
 ## Prerequisites (read before promising live demo)

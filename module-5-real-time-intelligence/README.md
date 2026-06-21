@@ -18,10 +18,12 @@
 
 Contoso's stores have IoT sensors: **freezer** temperature, **HVAC**, **foot traffic**, **checkout queue** depth. A freezer failure can't wait for tomorrow's POS export. **Real-Time Intelligence** ingests events, stores them in **Eventhouse**, dashboards them in seconds, and **Activator** pings Teams when thresholds breach.
 
-```
-Event Hub → Eventstream → Eventhouse (KQL) → Real-Time Dashboard
-                              │
-                              └── Activator → Teams / email alert
+```mermaid
+flowchart LR
+  EH[("Event Hub<br/>telemetry")] -->|"Eventstream<br/>es_telemetry"| KQL["eh_telemetry<br/>Eventhouse (KQL)"]
+  KQL --> RTD["rtd_stores<br/>Real-Time Dashboard"]
+  KQL --> ACT["act_store_alerts<br/>Activator"] --> Teams["Teams / email alert"]
+  KQL -. "OneLake shortcut (live)" .-> LH["lh_retail<br/>(zero-copy)"]
 ```
 
 Sample events live in `module-0-setup/data/telemetry.ndjson`; `setup.ps1 -Action send-events` streams them into the Event Hub.
