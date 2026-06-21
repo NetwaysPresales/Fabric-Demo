@@ -1,0 +1,35 @@
+// =====================================================================
+// Module 5 - Real-Time Dashboard / Activator queries (eh_telemetry)
+// Use these as Real-Time Dashboard tiles and as the Activator rule source.
+// =====================================================================
+
+// A) Live KPI - latest reading per sensor per store
+StoreTelemetry
+| summarize arg_max(event_ts, value, unit) by store_id, sensor
+| order by store_id asc, sensor asc
+
+// B) Time series - average value per sensor over the last hour (1-min bins) -> line chart tile
+StoreTelemetry
+| where event_ts > ago(1h)
+| summarize avg_value = avg(value) by sensor, bin(event_ts, 1m)
+| render timechart
+
+// C) THE ALERT CONDITION - freezer temperature breaching threshold (> 5 C)
+//    Point the Activator rule at this; push a breaching event live to fire a Teams/email alert.
+StoreTelemetry
+| where sensor == "freezer" and value > 5.0
+| project event_ts, store_id, value, unit
+| order by event_ts desc
+
+// D) Checkout queue SLA - stores where queue length exceeded 10 people
+StoreTelemetry
+| where sensor == "checkout_queue" and value > 10
+| summarize breaches = count(), max_queue = max(value) by store_id
+| order by breaches desc
+
+// E) Simple anomaly spotting on HVAC using series_decompose_anomalies
+StoreTelemetry
+| where sensor == "hvac" and event_ts > ago(6h)
+| make-series val = avg(value) on event_ts step 5m by store_id
+| extend anomalies = series_decompose_anomalies(val, 1.5)
+| render anomalychart

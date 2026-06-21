@@ -1,0 +1,33 @@
+// =====================================================================
+// Module 5 - Eventhouse / KQL database (eh_telemetry)
+// Run in the KQL queryset against the 'eh_telemetry' database.
+// Creates the landing table + JSON ingestion mapping for store telemetry.
+// =====================================================================
+
+// 1) Target table
+.create table StoreTelemetry (
+    event_id: string,
+    event_ts: datetime,
+    store_id: int,
+    sensor:   string,
+    value:    real,
+    unit:     string
+)
+
+// 2) JSON mapping (matches data/out/telemetry.ndjson). Used by Eventstream or direct ingestion.
+.create table StoreTelemetry ingestion json mapping "telemetry_map"
+'['
+'  {"column":"event_id","Properties":{"Path":"$.event_id"}},'
+'  {"column":"event_ts","Properties":{"Path":"$.event_ts"}},'
+'  {"column":"store_id","Properties":{"Path":"$.store_id"}},'
+'  {"column":"sensor","Properties":{"Path":"$.sensor"}},'
+'  {"column":"value","Properties":{"Path":"$.value"}},'
+'  {"column":"unit","Properties":{"Path":"$.unit"}}'
+']'
+
+// 3) (Optional) one-shot load from a public/SAS blob if not using Eventstream:
+// .ingest into table StoreTelemetry (h'https://<account>.blob.core.windows.net/<container>/telemetry.ndjson?<sas>')
+//   with (format='multijson', ingestionMappingReference='telemetry_map')
+
+// 4) Sanity check
+StoreTelemetry | count

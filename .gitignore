@@ -1,0 +1,17 @@
+# Local secrets / machine-specific config
+.env
+
+# Presenter-only material (your part as the demo-er) - not for followers
+presenter/
+
+# Source briefing doc - never publish (also covered by presenter/ above)
+*.docx
+Fabric Demo Focus Adjustment.docx
+
+# Generated sample data (recreate with: setup.ps1 -Action data)
+module-0-setup/data/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.tmp
