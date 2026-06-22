@@ -101,21 +101,21 @@ function New-SampleData {
     Write-Host "== Generate sample data ==" -ForegroundColor Cyan
     $rng = [System.Random]::new($Seed)
     New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
-    # US cities + states (+ ISO 3166-2 state_id like US-CA) so Power BI can render a
+    # US cities + states (+ ISO 3166-2 state_id like us-ca) so Power BI can render a
     # Shape map (USA: States, keyed on state_id) or a Filled map (keyed on state name) - Module 4.
     $usStores = @(
-        @{ city="New York";     state="New York";      state_id="US-NY"; region="Northeast" },
-        @{ city="Los Angeles";  state="California";    state_id="US-CA"; region="West" },
-        @{ city="Chicago";      state="Illinois";      state_id="US-IL"; region="Midwest" },
-        @{ city="Houston";      state="Texas";         state_id="US-TX"; region="South" },
-        @{ city="Phoenix";      state="Arizona";       state_id="US-AZ"; region="West" },
-        @{ city="Philadelphia"; state="Pennsylvania";  state_id="US-PA"; region="Northeast" },
-        @{ city="Seattle";      state="Washington";    state_id="US-WA"; region="West" },
-        @{ city="Miami";        state="Florida";       state_id="US-FL"; region="South" },
-        @{ city="Atlanta";      state="Georgia";       state_id="US-GA"; region="South" },
-        @{ city="Denver";       state="Colorado";      state_id="US-CO"; region="West" },
-        @{ city="Boston";       state="Massachusetts"; state_id="US-MA"; region="Northeast" },
-        @{ city="Detroit";      state="Michigan";      state_id="US-MI"; region="Midwest" }
+        @{ city="New York";     state="New York";      state_id="us-ny"; region="Northeast" },
+        @{ city="Los Angeles";  state="California";    state_id="us-ca"; region="West" },
+        @{ city="Chicago";      state="Illinois";      state_id="us-il"; region="Midwest" },
+        @{ city="Houston";      state="Texas";         state_id="us-tx"; region="South" },
+        @{ city="Phoenix";      state="Arizona";       state_id="us-az"; region="West" },
+        @{ city="Philadelphia"; state="Pennsylvania";  state_id="us-pa"; region="Northeast" },
+        @{ city="Seattle";      state="Washington";    state_id="us-wa"; region="West" },
+        @{ city="Miami";        state="Florida";       state_id="us-fl"; region="South" },
+        @{ city="Atlanta";      state="Georgia";       state_id="us-ga"; region="South" },
+        @{ city="Denver";       state="Colorado";      state_id="us-co"; region="West" },
+        @{ city="Boston";       state="Massachusetts"; state_id="us-ma"; region="Northeast" },
+        @{ city="Detroit";      state="Michigan";      state_id="us-mi"; region="Midwest" }
     )
     $cats   = @("Electronics","Grocery","Apparel","Home","Beauty","Sports","Toys","Books")
     (1..$Stores | ForEach-Object { $u=$usStores[($_-1)%$usStores.Count]; [pscustomobject]@{ store_id=$_; store_name="Contoso $($u.city)"; city=$u.city; state=$u.state; state_id=$u.state_id; region=$u.region } }) | Export-Csv (Join-Path $DataDir "stores.csv") -NoTypeInformation

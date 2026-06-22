@@ -43,13 +43,13 @@ Data is read straight from OneLake Delta — no import job and no per-visual Dir
 
 ## 4.2 Quick report (with a US map)
 
-The gold table carries **`state`** (e.g. California) and **`state_id`** (ISO code e.g. `US-CA`), so you can shade a US map by sales.
+The gold table carries **`state`** (e.g. California) and **`state_id`** (ISO code, lowercase e.g. `us-ca`), so you can shade a US map by sales.
 
 1. **New report** from the model → **Save** as **`rpt_retail_overview`**.
 2. Add visuals:
    - **Card** — Net Sales
    - **US map by state:**
-     - **Shape map** (Desktop; enable under Options → Preview features) → map **USA: States** → **Location = `state_id`** (matches the ISO `US-CA` keys), **Color = Net Sales**.
+     - **Shape map** (Desktop; enable under Options → Preview features) → map **USA: States** → **Location = `state_id`** (matches the lowercase ISO `us-ca` keys), **Color = Net Sales**.
      - **or Filled map** (works in the browser/service) → **Location = `state`** (set its **Data category = State or Province** in the model first), **Color saturation = Net Sales**.
    - **Column chart** — Net Sales by `region`
    - **Line chart** — Net Sales by `sale_date`
