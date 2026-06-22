@@ -57,18 +57,31 @@ Contoso's nightly CSVs land in **Azure Blob Storage** (`ntwfabricdemostg/retail-
 A **Task flow** is a canvas of typed **tasks** (boxes) connected as a graph, each assigned a real Fabric item — the workspace's blueprint. Import the ready-made flow instead of hand-placing every box:
 
 1. Open the **task flow** canvas (below the item list) → **Set up a task flow** → **Import** → choose [`demo-task-flow.json`](demo-task-flow.json) from this folder.
-2. It lays out the demo as a graph with **two parallel branches** — a **batch** path and a **real-time** path — that converge at Distribute/Govern:
+2. It lays out the demo as a graph with **two parallel branches** — a **batch** path and a **real-time** path — that converge at Distribute / Govern:
 
-   ```
-   BATCH                                                                ┌─► Develop (wh_retail) ─┐
-   Copy job ─┐                                                          │                        │
-             ├─► lh_retail ─► Medallion (notebooks/dataflow) ──────────►├─► ML forecast ─────────┼─► Power BI ─┐
-   Mirror ───┘        │                                                 └────────────────────────┘            │
-                      └─► Govern (Domains/Purview/OneLake security)                                            ├─► Distribute
-   REAL-TIME                                                                                                   │   (Data agent
-   Eventstream (from Event Hub) ─► Eventhouse (KQL) ─┬─► Real-Time Dashboard ───────────────────────────────────┘    + deploy)
-                                                     └─► Activator (+ metrics)
-   ```
+```mermaid
+flowchart LR
+  subgraph Batch
+    CJ["Get data<br/>Copy job"] --> ST["Store data<br/>lh_retail"]
+    MIR["Mirror data<br/>sqldb_orders"] --> ST
+    ST --> PREP["Prepare data<br/>medallion + dataflow"]
+    PREP --> DEV["Develop<br/>wh_retail"]
+    PREP --> MLF["Analyze & train<br/>ML forecast"]
+    PREP --> VIZ["Visualize<br/>Power BI"]
+    DEV --> VIZ
+    MLF --> VIZ
+  end
+  subgraph RT["Real-time"]
+    ES["Get data<br/>Eventstream (Event Hub)"] --> EH["Store data<br/>Eventhouse (KQL)"]
+    EH --> RTD["Visualize<br/>Real-Time Dashboard"]
+    EH --> TRK["Track data<br/>Activator + metrics"]
+  end
+  VIZ --> DIST["Distribute data<br/>Data agent + deploy"]
+  RTD --> DIST
+  ST --> GOV["Govern data<br/>Domains · Purview · OneLake security"]
+  EH --> GOV
+```
+
 3. Assign the real item to each task as it's built across the modules (table below). To add/adjust a task by hand, use **+ Add a task** (types: Get/Mirror/Store/Prepare/Analyze and train/Develop/Visualize/Track/Distribute/Govern data).
 
 | Branch | Task (type) | Item assigned | Module |
