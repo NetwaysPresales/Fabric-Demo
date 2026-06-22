@@ -52,11 +52,17 @@ Analysts get T-SQL over Spark output; all writes stay in notebooks — an intent
 
 1. **Create the warehouse** (if it doesn't exist yet): workspace → **+ New item → Warehouse** → name **`wh_retail`** → **Create**. *(Already exists if you ran `module-2-warehouse-vs-lakehouse/run.ps1`.)* Then open it → **New SQL query**.
 2. Paste and run **`warehouse_ddl.sql`**:
-   - Builds `dbo.dim_store`, `dbo.fact_sales_daily` from **`lh_retail.gold.sales_by_store_day`** (three-part name — cross-item, zero copy)
-   - Runs a **multi-table ACID transaction** (lakehouse endpoint cannot)
-3. Run **`cross_query.sql`** — joins warehouse table to lakehouse table in one query.
+   - Builds `dbo.dim_store` + `dbo.fact_sales_daily` by selecting from **`lh_retail.gold.sales_by_store_day`** using a **three-part name** — a **cross-item read** with no ETL (see note below).
+   - Runs a **multi-table ACID transaction** (the lakehouse SQL endpoint cannot).
+3. Run **`cross_query.sql`** — `SELECT` that joins a warehouse table to a lakehouse table in one query (the true zero-copy example — nothing is materialized).
 
-The warehouse targets SQL developers: full DDL/DML, stored procedures, and V-Order by default — over the same Delta files underneath.
+### Three-part naming & what's actually zero-copy
+
+- **Three-part name** = `database.schema.table`, i.e. `lh_retail.gold.sales_by_store_day`. Every lakehouse exposes a read-only **SQL analytics endpoint** that the warehouse sees as **another database in the same workspace**, so one T-SQL query can span both items.
+- **Zero-copy / zero-ETL = the *read*:** the warehouse reads the lakehouse's Delta files **in place** in OneLake — no pipeline, no export/import, no synced duplicate just to make the data queryable.
+- **Caveat:** `CREATE TABLE … AS SELECT` and `INSERT … SELECT` in `warehouse_ddl.sql` **do materialize** new warehouse tables (a real copy) — that's the warehouse showing off DDL/DML/ACID. The **pure zero-copy** move is `cross_query.sql`: a join across both items that returns results **without creating anything**.
+
+The warehouse targets SQL developers: full DDL/DML, stored procedures, and V-Order by default — over the same OneLake Delta the lakehouse reads.
 
 > **Copilot:** SQL editor → autocomplete or *"generate top categories by net sales"*. Module 9 for full agent tour.
 
