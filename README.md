@@ -17,7 +17,7 @@ We **ingest the blob files with a Copy job into OneLake** (orchestrated visually
 ```mermaid
 flowchart LR
   Blob[("Azure Blob<br/>raw CSVs")] -->|"Copy job"| Bronze
-  SQLDB[("sqldb_orders<br/>OLTP")] -. "auto-mirror ~30s" .-> Gold
+  SQLDB[("Module 3<br/>sqldb_orders OLTP")] -. "auto-mirror ~30s" .-> M1
   subgraph M1["Module 1 · lh_retail medallion"]
     Bronze --> Silver --> Gold["gold<br/>data products"]
   end
@@ -27,6 +27,7 @@ flowchart LR
   EH[("Event Hub")] -->|"Eventstream"| KQL["Module 5<br/>Eventhouse (KQL)"]
   KQL --> RTD["Real-Time Dashboard"]
   KQL --> ACT["Activator → Teams"]
+  KQL -. "OneLake shortcut (live)" .-> M1
   Gold --> AG["Module 9<br/>Data Agent / Copilot"]
   Gold -. "governed by" .-> GOV["Module 7<br/>Domains · Purview · Security"]
   WH -. "shipped via" .-> ALM["Module 8<br/>Git · Deploy · Capacity"]
