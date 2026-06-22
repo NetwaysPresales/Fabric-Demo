@@ -47,7 +47,7 @@ This is a real OLTP engine — IDENTITY columns, defaults, ACID — i.e. an appl
 
 Translytical: the app writes here while analysts query the mirrored copy — one source of truth, no pipeline schedule.
 
-Optional (translytical blend): create a **shortcut** in `lh_retail` → `Files/orders_shortcut` to the mirrored `Orders`, then read it in a notebook and join to `gold.sales_by_store_day` — POS batch + live orders in one Spark session, zero copy.
+> Want this data **inside `lh_retail`** (to blend with gold)? The mirror lives under the `sqldb_orders` item — surface it in the lakehouse with a shortcut (no copy). See **§3.4**.
 
 ---
 
@@ -62,10 +62,28 @@ Optional (translytical blend): create a **shortcut** in `lh_retail` → `Files/o
 
 ---
 
+## 3.4 Surface the mirror in the lakehouse (OneLake shortcut)
+
+Mirroring on a **Fabric-native SQL database is automatic** — there's nothing to "turn on" to a lakehouse. The committed rows continuously replicate to OneLake as Delta **under the `sqldb_orders` item**. To use them *inside* `lh_retail` (Spark + the lakehouse SQL endpoint), point a **shortcut** at that mirrored Delta — zero copy:
+
+1. `lh_retail` → **Tables** → **New shortcut** → **Microsoft OneLake**.
+2. Select **`sqldb_orders`** → tick the mirrored tables **`Orders`** (and `OrderItems`).
+3. They now appear as tables in `lh_retail`, queryable like any other — e.g. in a notebook:
+   ```python
+   orders = spark.table("Orders")            # the shortcut, read in place
+   display(orders.groupBy("store_id").sum("order_total"))
+   ```
+   …and you can join them to `gold.sales_by_store_day` — **POS batch + live app orders in one query, no copy** (translytical).
+
+> **External** sources (Azure SQL, Cosmos DB, Snowflake) instead use a **Mirrored Database** item — **+ New → Mirrored Azure SQL Database / …** — which sets up the replication into OneLake. Our SQL DB is Fabric-native, so it mirrors with no setup.
+
+---
+
 ## Checklist → Module 4
 
 - [ ] Orders inserted in OLTP
 - [ ] Same rows visible on analytics endpoint within ~30s
 - [ ] Mirroring = Running
+- [ ] (Optional) Shortcut surfaces `Orders` inside `lh_retail` (§3.4)
 
 **Next:** [`module-4-direct-lake-powerbi/`](../module-4-direct-lake-powerbi/README.md) — executives consume gold via Direct Lake.
