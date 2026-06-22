@@ -147,6 +147,19 @@ Same files, no movement: bronze = raw audit trail, silver = trusted model, gold 
 
 > **Copilot:** Notebook Copilot pane → *"Explain this notebook"* or *"Write PySpark to dedupe fact_sales"*. Full agent tour in Module 9.
 
+### Play around: Data Wrangler (no-code prep)
+
+**Data Wrangler** is a grid-based data-prep tool built into Fabric notebooks. You open any **pandas or Spark DataFrame** in it, see per-column stats and distributions, apply transforms by **clicking** (filter rows, drop/rename columns, change types, fill/replace nulls, one-hot encode, group & aggregate), preview the result live — and it **auto-generates the equivalent PySpark/pandas code** to paste back into a cell. It's the point-and-click way to do exactly what `02_silver_transform` does by hand.
+
+Try it on the raw sales:
+
+1. In a new cell, load a frame: `df = spark.table("bronze.sales")`.
+2. Notebook ribbon → **Data** → **Launch Data Wrangler** → choose `df` (or use the **Data Wrangler** dropdown on any displayed DataFrame).
+3. Apply a few operations from the panel — e.g. **filter** `quantity > 0`, **change type** on `sale_ts` to datetime, **fill/drop** nulls — and watch the **Cleaning steps** list and the **generated code** update on the right.
+4. **+ Add code to notebook** to export those steps as a runnable cell.
+
+Good for analysts/citizen developers and for quickly drafting cleaning logic before hardening it in code.
+
 ---
 
 ## 1.3 V-Order (notebook `04`)
