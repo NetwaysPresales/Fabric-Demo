@@ -41,7 +41,24 @@ Sample events live in `module-0-setup/data/telemetry.ndjson`; `setup.ps1 -Action
 ## 5.2 Eventstream — ingest live events
 
 1. **+ New item → Eventstream** → **`es_telemetry`**.
-2. **Add source → Azure Event Hubs** → the namespace **`ntwfabricdemoeh`**, hub **`telemetry`** (provisioned by `setup.ps1 -Action eventhub`). Auth = the connection / key. *(Fallback: **Sample data** or a **Custom endpoint** if the hub isn't available.)*
+2. **Add source → Azure Event Hubs → New connection** (provisioned by `setup.ps1 -Action eventhub`). Enter **exactly**:
+
+   | Field | Value |
+   | --- | --- |
+   | Event Hubs namespace | **`ntwfabricdemoeh.servicebus.windows.net`** |
+   | Event Hub | **`telemetry`** |
+   | Consumer group | `$Default` |
+   | Authentication | **Shared Access Key** |
+   | Shared Access Key Name | `RootManageSharedAccessKey` |
+   | Shared Access Key | *primary key (below)* |
+   | Data format | `Json` |
+
+   Get the key (it's also in `.env` as `EVENTHUB_CONNECTION_STRING`):
+   ```powershell
+   az eventhubs namespace authorization-rule keys list --resource-group rg-fabric-demo `
+     --namespace-name ntwfabricdemoeh --name RootManageSharedAccessKey --query primaryKey -o tsv
+   ```
+   > Always create a **New connection** with these values — **don't** reuse an unrelated `azure-event-hub` connection. A wrong namespace fails with *"Failed to resume data source … No such host is known."* *(Fallback if the hub is unavailable: **Sample data** or a **Custom endpoint**.)*
 3. **Add destination → Eventhouse** → `eh_telemetry` / table **`StoreTelemetry`** / mapping **`telemetry_map`**.
 4. *(Optional)* drop an **event-processing** step between source and destination — filter to `freezer` only, or a **windowed average** — to show no-code stream transforms.
 5. **Publish**.

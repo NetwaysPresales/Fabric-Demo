@@ -39,6 +39,11 @@ flowchart TD
 | Storage | `ntwfabricdemostg` / container `retail-raw` |
 | Event Hub | `ntwfabricdemoeh` / `telemetry` |
 
+> **Event Hub connection (used in Module 5):** namespace FQDN **`ntwfabricdemoeh.servicebus.windows.net`**, hub **`telemetry`**, consumer group **`$Default`**, auth **Shared Access Key** (key name `RootManageSharedAccessKey`). Get the key — also stored in `.env` as `EVENTHUB_CONNECTION_STRING`:
+> ```powershell
+> az eventhubs namespace authorization-rule keys list --resource-group rg-fabric-demo --namespace-name ntwfabricdemoeh --name RootManageSharedAccessKey --query primaryKey -o tsv
+> ```
+
 ---
 
 ## Prerequisites
