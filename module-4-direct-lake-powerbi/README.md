@@ -43,13 +43,14 @@ Data is read straight from OneLake Delta — no import job and no per-visual Dir
 
 ## 4.2 Quick report (with a US map)
 
-The gold table carries a **`state`** column (US states — e.g. California, Texas), so you can shade a map by sales.
+The gold table carries **`state`** (e.g. California) and **`state_id`** (ISO code e.g. `US-CA`), so you can shade a US map by sales.
 
 1. **New report** from the model → **Save** as **`rpt_retail_overview`**.
-2. *(One-time, for clean geocoding)* in the model select **`sales_by_store_day[state]`** → **Properties → Data category = State or Province**.
-3. Add visuals:
+2. Add visuals:
    - **Card** — Net Sales
-   - **US map by state** — **Filled map** (works in the browser/service): **Location = `state`**, **Color saturation = Net Sales** → states shade by sales. *(In Power BI Desktop you can instead use the **Shape map** visual → built-in map **USA: States**; enable it under Options → Preview features.)*
+   - **US map by state:**
+     - **Shape map** (Desktop; enable under Options → Preview features) → map **USA: States** → **Location = `state_id`** (matches the ISO `US-CA` keys), **Color = Net Sales**.
+     - **or Filled map** (works in the browser/service) → **Location = `state`** (set its **Data category = State or Province** in the model first), **Color saturation = Net Sales**.
    - **Column chart** — Net Sales by `region`
    - **Line chart** — Net Sales by `sale_date`
 
