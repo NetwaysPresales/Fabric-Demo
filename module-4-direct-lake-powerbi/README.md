@@ -41,10 +41,17 @@ Data is read straight from OneLake Delta — no import job and no per-visual Dir
 
 ---
 
-## 4.2 Quick report
+## 4.2 Quick report (with a US map)
 
-1. **New report** from model → **Save** as **`rpt_retail_overview`**.
-2. Visuals: **Card** (Net Sales), **Column chart** (by region), **Line chart** (by sale_date).
+The gold table carries a **`state`** column (US states — e.g. California, Texas), so you can shade a map by sales.
+
+1. **New report** from the model → **Save** as **`rpt_retail_overview`**.
+2. *(One-time, for clean geocoding)* in the model select **`sales_by_store_day[state]`** → **Properties → Data category = State or Province**.
+3. Add visuals:
+   - **Card** — Net Sales
+   - **US map by state** — **Filled map** (works in the browser/service): **Location = `state`**, **Color saturation = Net Sales** → states shade by sales. *(In Power BI Desktop you can instead use the **Shape map** visual → built-in map **USA: States**; enable it under Options → Preview features.)*
+   - **Column chart** — Net Sales by `region`
+   - **Line chart** — Net Sales by `sale_date`
 
 This report is the artifact Module 7 lineage and Module 9 agents reference.
 

@@ -101,9 +101,23 @@ function New-SampleData {
     Write-Host "== Generate sample data ==" -ForegroundColor Cyan
     $rng = [System.Random]::new($Seed)
     New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
-    $cities = @("Dubai","Abu Dhabi","Sharjah","Riyadh","Jeddah","Doha","Manama","Kuwait City","Muscat","Cairo","Amman","Beirut")
+    # US cities + states so Power BI can render a Filled/Shape map by state (Module 4).
+    $usStores = @(
+        @{ city="New York";     state="New York";      region="Northeast" },
+        @{ city="Los Angeles";  state="California";    region="West" },
+        @{ city="Chicago";      state="Illinois";      region="Midwest" },
+        @{ city="Houston";      state="Texas";         region="South" },
+        @{ city="Phoenix";      state="Arizona";       region="West" },
+        @{ city="Philadelphia"; state="Pennsylvania";  region="Northeast" },
+        @{ city="Seattle";      state="Washington";    region="West" },
+        @{ city="Miami";        state="Florida";       region="South" },
+        @{ city="Atlanta";      state="Georgia";       region="South" },
+        @{ city="Denver";       state="Colorado";      region="West" },
+        @{ city="Boston";       state="Massachusetts"; region="Northeast" },
+        @{ city="Detroit";      state="Michigan";      region="Midwest" }
+    )
     $cats   = @("Electronics","Grocery","Apparel","Home","Beauty","Sports","Toys","Books")
-    (1..$Stores | ForEach-Object { [pscustomobject]@{ store_id=$_; store_name="Contoso $($cities[($_-1)%$cities.Count])"; city=$cities[($_-1)%$cities.Count]; region=@("North","Central","South")[$_%3] } }) | Export-Csv (Join-Path $DataDir "stores.csv") -NoTypeInformation
+    (1..$Stores | ForEach-Object { $u=$usStores[($_-1)%$usStores.Count]; [pscustomobject]@{ store_id=$_; store_name="Contoso $($u.city)"; city=$u.city; state=$u.state; region=$u.region } }) | Export-Csv (Join-Path $DataDir "stores.csv") -NoTypeInformation
     (1..$Products | ForEach-Object { $c=$cats[$rng.Next(0,$cats.Count)]; [pscustomobject]@{ product_id=$_; product_name="$c Item $_"; category=$c; unit_price=[math]::Round(($rng.NextDouble()*490+10),2) } }) | Export-Csv (Join-Path $DataDir "products.csv") -NoTypeInformation
     $start = (Get-Date).AddDays(-365)
     $sw = [System.IO.StreamWriter]::new((Join-Path $DataDir "sales.csv")); $sw.WriteLine("sale_id,sale_ts,store_id,product_id,quantity,discount_pct")
